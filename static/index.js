@@ -168,7 +168,7 @@ export class Player {
     /**
      * Get a game
      * @param {string} game_id game id
-     * @returns {Promise<{game: game}>}
+     * @returns {Promise<game>}
      */
     async getGame(game_id) {
         const response = await fetch(`http://127.0.0.1:3000/games/${game_id}`, {
@@ -188,10 +188,64 @@ export class Player {
          */
         const data = await response.json();
 
-        return data;
+        return data.game;
     }
 
-    async updateGame(game_id) {
-        const response = await fetch(`http://127.0.0.1:3000/games/`)
+    /**
+     * Update the game
+     * @param {string} game_id game id
+     * @param {string} new_name set new name of the game
+     * @param {string} new_status set new status (active / inactive)
+     * @returns {Promise<game>}
+     */
+    async updateGame(game_id, new_name, new_status) {
+        const response = await fetch(`http://127.0.0.1:3000/games/${game_id}`, {
+            method: "PUT",
+            headers: {
+                "X-API-Key": this.#api_key,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                "name": new_name,
+                "status": new_status
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`[ERROR] ${response}`);
+        }
+
+        /**
+         * @type {{message: string, game: game}}
+         */
+        const data = await response.json();
+
+        return data.game;
+    }
+
+    /**
+     * Delete a game
+     * @param {string} game_id game id
+     * @returns {Promise<string>}
+     */
+    async deleteGame(game_id) {
+        const response = await fetch(`http://127.0.0.1:3000/games/${game_id}`, {
+            method: "DELETE",
+            headers: {
+                "X-API-Key": this.#api_key,
+                "Content-Type": "application/json"
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`[ERROR] ${response}`);
+        }
+
+        /**
+         * @type {string} successful or error message
+         */
+        const data = await response.json();
+
+        return data;
     }
 }

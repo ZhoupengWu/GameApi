@@ -4,5 +4,11 @@
     "username": "john_doe",
     "apiKey": "4cf54f7a-8887-44c5-8739-75116039b698341d0937019d448d8641d2d18aafb5e0",
     "createdAt": "2026-02-24T16:03:22.593Z"
+  },
+  {
+    "id": "c99a1166-9f79-432a-a0b1-396d76898cd8",
+    "username": "test",
+    "apiKey": "cd92ec5a-0f77-4792-ba77-f9f6e876b398bf78d1280d2b425e9cb1d219ae5ffd81",
+    "createdAt": "2026-03-26T12:18:16.544Z"
   }
 ]
