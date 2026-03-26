@@ -10,7 +10,7 @@ const options = {
     },
     servers: [
       {
-        url: 'https://fluffy-sniffle-x9r9jvjx76g36jxr-3000.app.github.dev/',
+        url: 'https://scaling-umbrella-pjp7wq64p65p2r9vj-3000.app.github.dev/',
         description: 'Development server'
       }
     ],

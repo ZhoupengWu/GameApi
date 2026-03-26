@@ -1,0 +1,22 @@
+{
+    "compilerOptions": {
+        "target": "esnext",
+        "module": "esnext",
+        "lib": ["ESNext", "DOM", "DOM.Iterable"],
+        "moduleResolution": "node",
+        "checkJs": true,
+        "allowSyntheticDefaultImports": true,
+        "baseUrl": ".",
+        "paths": {
+            "/*": ["./*"]
+        }
+    },
+    "include": [
+        "**/*.js"
+    ],
+    "exclude": [
+        "node_modules",
+        "dist",
+        "build"
+    ]
+}
