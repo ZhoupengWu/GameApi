@@ -1,11 +1,12 @@
 {
     "compilerOptions": {
         "target": "esnext",
-        "module": "esnext",
+        "module": "nodenext",
         "lib": ["ESNext", "DOM", "DOM.Iterable"],
-        "moduleResolution": "node",
+        "moduleResolution": "nodenext",
         "checkJs": true,
         "allowSyntheticDefaultImports": true,
+        "ignoreDeprecations": "6.0",
         "baseUrl": ".",
         "paths": {
             "/*": ["./*"]

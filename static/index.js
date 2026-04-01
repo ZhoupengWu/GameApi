@@ -26,20 +26,16 @@
  * const player = new Player("Maheeh");
  * await player.createGame();
  */
-export class Player {
+class Player {
     /**
      * @type {string}
      */
     #name_player;
 
     /**
-     * @type {string}
-     */
-    #api_key;
-
-    /**
      * @type {user}
      */
+    // @ts-ignore
     #player_information;
 
     /**
@@ -48,11 +44,9 @@ export class Player {
      */
     constructor(name) {
         this.#name_player = name;
-        this.#api_key = null;
         this.#register()
             .then(user => {
                 this.#player_information = user;
-                this.#api_key = user.apiKey;
             })
             .catch(err => {
                 throw new Error(`[ERROR] ${err}`);
@@ -68,20 +62,15 @@ export class Player {
     }
 
     /**
-     * Set the name of the player
-     * @param {string} name name of the player
-     * @returns {void}
-     */
-    setName(name) {
-        this.#name_player = name;
-    }
-
-    /**
      * Get the api key
      * @returns {string}
      */
     #getApiKey() {
-        return this.#api_key;
+        if (!this.#player_information.apiKey) {
+            throw new Error("[ERROR] API key is not initialized");
+        }
+
+        return this.#player_information.apiKey;
     }
 
     /**
@@ -107,6 +96,7 @@ export class Player {
          * @type {{message: string, user: user}}
          */
         const data = await response.json();
+        console.log(data.user);
 
         return data.user;
     }
@@ -117,7 +107,7 @@ export class Player {
      * @returns {Promise<{message: string, game: game}>}
      */
     async createGame(name_game) {
-        const response = await fetch("http://127.0.0.1:3000/games", {
+        const response = await fetch("/games", {
             method: "POST",
             headers: {
                 "X-API-Key": this.#getApiKey(),
@@ -145,7 +135,7 @@ export class Player {
      * @returns {Promise<Array<game>>}
      */
     async listGame() {
-        const response = await fetch("http://127.0.0.1:3000/games", {
+        const response = await fetch("/games", {
             method: "GET",
             headers: {
                 "X-API-Key": this.#getApiKey(),
@@ -171,10 +161,10 @@ export class Player {
      * @returns {Promise<game>}
      */
     async getGame(game_id) {
-        const response = await fetch(`http://127.0.0.1:3000/games/${game_id}`, {
+        const response = await fetch(`/games/${game_id}`, {
             method: "GET",
             headers: {
-                "X-API-Key": this.#api_key,
+                "X-API-Key": this.#getApiKey(),
                 "Content-Type": "application/json"
             }
         });
@@ -199,10 +189,10 @@ export class Player {
      * @returns {Promise<game>}
      */
     async updateGame(game_id, new_name, new_status) {
-        const response = await fetch(`http://127.0.0.1:3000/games/${game_id}`, {
+        const response = await fetch(`/games/${game_id}`, {
             method: "PUT",
             headers: {
-                "X-API-Key": this.#api_key,
+                "X-API-Key": this.#getApiKey(),
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({
@@ -229,10 +219,10 @@ export class Player {
      * @returns {Promise<string>}
      */
     async deleteGame(game_id) {
-        const response = await fetch(`http://127.0.0.1:3000/games/${game_id}`, {
+        const response = await fetch(`/games/${game_id}`, {
             method: "DELETE",
             headers: {
-                "X-API-Key": this.#api_key,
+                "X-API-Key": this.#getApiKey(),
                 "Content-Type": "application/json"
             }
         });
@@ -249,3 +239,11 @@ export class Player {
         return data;
     }
 }
+
+const player1 = new Player("Alessia");
+const game = player1.createGame("lotto");
+game.then((data) => {
+    console.log(data);
+}).catch((err) => {
+    console.error(err);
+});
