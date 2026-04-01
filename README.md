@@ -28,7 +28,14 @@ Il client statico di registrazione Tetris e servito dal backend Express su:
 http://localhost:3000/frontend
 ```
 
-L'entry point browser e `static/index.js`, mentre il client per autenticazione e chiamate API e in `static/client_auth.js`.
+L'entry point browser è `static/index.js`, mentre il client per autenticazione e chiamate API è in `static/client_auth.js`.
+
+Struttura frontend attuale:
+
+- `static/index.js`: bootstrap e cambio vista.
+- `static/session_storage.js`: persistenza locale della sessione.
+- `static/views/register_view.js`: schermata di registrazione.
+- `static/views/lobby_view.js`: schermata post-login con creazione partita e lista lobby.
 
 ## API Docs
 Swagger UI is available at:

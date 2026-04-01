@@ -61,9 +61,18 @@ export class Player {
     /**
      * Create and register a new player
      * @param {string} name name of the player
+     * @param {user} [existingProfile]
      */
-    constructor(name) {
+    constructor(name, existingProfile) {
         this.#name_player = name;
+
+        if (existingProfile) {
+            this.#player_information = { ...existingProfile };
+            this.#ready = Promise.resolve();
+            
+            return;
+        }
+
         this.#ready = this.#register()
             .then(user => {
                 this.#player_information = user;
@@ -71,6 +80,15 @@ export class Player {
             .catch(err => {
                 throw new Error(err.message);
             });
+    }
+
+    /**
+     * Rebuild a client instance from an already registered profile.
+     * @param {user} profile
+     * @returns {Player}
+     */
+    static fromProfile(profile) {
+        return new Player(profile.username, profile);
     }
 
     /**
