@@ -26,7 +26,7 @@
  * const player = new Player("Maheeh");
  * await player.createGame();
  */
-class Player {
+export class Player {
     /**
      * @type {string}
      */
@@ -54,7 +54,7 @@ class Player {
                 this.#player_information = user;
             })
             .catch(err => {
-                throw new Error(`[ERROR] ${err}`);
+                throw new Error(err.message);
             });
     }
 
@@ -64,6 +64,27 @@ class Player {
      */
     getName() {
         return this.#name_player;
+    }
+
+    /**
+     * Wait until the player registration has completed
+     * @returns {Promise<user>}
+     */
+    async waitUntilReady() {
+        await this.#ensureReady();
+        return this.getProfile();
+    }
+
+    /**
+     * Get the registered player information
+     * @returns {user}
+     */
+    getProfile() {
+        if (!this.#player_information) {
+            throw new Error("[ERROR] Player information is not initialized");
+        }
+
+        return { ...this.#player_information };
     }
 
     /**
@@ -102,15 +123,22 @@ class Player {
         });
 
         if (!response.ok) {
-            throw new Error(`[ERROR] ${response}`);
+            let errorMessage = "Registration failed";
+
+            try {
+                const errorData = await response.json();
+                errorMessage = errorData.error || errorMessage;
+            } catch {
+                errorMessage = response.statusText || errorMessage;
+            }
+
+            throw new Error(errorMessage);
         }
 
         /**
          * @type {{message: string, user: user}}
          */
         const data = await response.json();
-        console.log(data.user);
-
         return data.user;
     }
 
