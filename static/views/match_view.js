@@ -10,7 +10,6 @@ import {
 } from "../game/tetris_engine.js";
 import { escapeHtml, getRequiredElement } from "../utils/dom.js";
 
-const POLL_INTERVAL_MS = 2000;
 const SHARED_SESSION_LABEL = "Sessione condivisa";
 
 /**
@@ -98,7 +97,6 @@ export function renderMatchView(root, profile, gameId, options) {
     /** @type {Array<{id: string, playerId: string, data: Record<string, unknown>, timestamp: string}>} */
     let currentMoves = [];
     let isSubmitting = false;
-    let pollHandle = 0;
     let disposed = false;
     let isEditingLocalPlayerName = false;
     let localPlayerDraftName = "";
@@ -265,20 +263,93 @@ export function renderMatchView(root, profile, gameId, options) {
 
         if (!opponentPlayer) {
             matchContent.innerHTML = `
-                <div class="waiting-room">
-                    <div class="empty-state">
-                        <p>Player locale selezionato: <strong>${escapeHtml(selfPlayer.name)}</strong></p>
-                        <p class="muted-copy">Apri un secondo browser o tab, usa la stessa API key e scegli il nome dell'avversario in questa stessa lobby.</p>
+                <div class="match-player-banner">
+                    <div class="match-player-badge">
+                        <span class="panel-kicker">Stai giocando come</span>
+                        <strong>${escapeHtml(selfPlayer.name)}</strong>
+                    </div>
+                    <div class="match-player-actions">
                         <button id="change-local-player-button" class="secondary-button" type="button">Cambia player locale</button>
+                        <button id="remove-local-player-button" class="secondary-button" type="button">Rimuovi player</button>
                     </div>
-                    <div class="board-preview-card">
-                        <p class="panel-kicker">La tua griglia</p>
-                        ${renderBoardHtml(ownState.board, previewCells, false)}
-                    </div>
+                </div>
+
+                <div class="match-grid">
+                    <section class="board-section">
+                        <div class="panel-header panel-header-inline">
+                            <div>
+                                <p class="panel-kicker">La tua griglia</p>
+                                <h3>${escapeHtml(selfPlayer.name)}</h3>
+                            </div>
+                            <div class="score-card">
+                                <span>Linee</span>
+                                <strong>${String(ownState.linesCleared)}</strong>
+                            </div>
+                        </div>
+
+                        <div id="pieces-picker" class="pieces-picker">
+                            ${getPieceCatalog().map((piece, index) => `
+                                <button
+                                    type="button"
+                                    class="piece-chip ${piece.id === localState.selectedPieceId ? "piece-chip-active" : ""}"
+                                    data-piece-id="${escapeHtml(piece.id)}"
+                                >
+                                    ${index + 1}. ${escapeHtml(piece.label)}
+                                </button>
+                            `).join("")}
+                        </div>
+
+                        <div id="own-board" class="board" aria-label="Griglia personale">
+                            ${renderBoardHtml(ownState.board, previewCells, true)}
+                        </div>
+
+                        <div class="control-cluster">
+                            <div class="direction-pad">
+                                <button type="button" class="secondary-button" data-control="up">Su</button>
+                                <div class="direction-row">
+                                    <button type="button" class="secondary-button" data-control="left">Sinistra</button>
+                                    <button type="button" class="secondary-button" data-control="down">Giu</button>
+                                    <button type="button" class="secondary-button" data-control="right">Destra</button>
+                                </div>
+                            </div>
+                            <div class="rotation-pad">
+                                <button type="button" class="secondary-button" data-control="rotate-left">Ruota -90</button>
+                                <button type="button" class="secondary-button" data-control="rotate-right">Ruota +90</button>
+                                <button type="button" id="place-piece-button" ${canPlace && !isSubmitting ? "" : "disabled"}>Blocca pedina</button>
+                            </div>
+                        </div>
+
+                        <p class="status ${canMoveAtAll ? "" : "status-inline-error"}" data-state="${canMoveAtAll ? "idle" : "error"}">
+                            ${canMoveAtAll ? "Il secondo player non e ancora entrato. Puoi comunque preparare e giocare sulla tua griglia." : "Nessuna pedina disponibile entra piu nella griglia attuale."}
+                        </p>
+                    </section>
+
+                    <section class="board-section">
+                        <div class="panel-header panel-header-inline">
+                            <div>
+                                <p class="panel-kicker">Griglia avversaria</p>
+                                <h3>In attesa del secondo player</h3>
+                            </div>
+                            <div class="score-card">
+                                <span>Linee</span>
+                                <strong>0</strong>
+                            </div>
+                        </div>
+
+                        <div class="board" aria-label="Griglia avversaria in attesa">
+                            ${renderBoardHtml(createEmptyBoard(), [], false)}
+                        </div>
+
+                        <div class="match-sidebar-card">
+                            <p class="panel-kicker">Stato lobby</p>
+                            <p class="muted-copy">Apri un secondo browser o tab, usa la stessa API key e scegli il nome dell'avversario in questa stessa lobby.</p>
+                            <p class="muted-copy">Se l'altro player e gia entrato altrove, usa il bottone Aggiorna per sincronizzare la partita.</p>
+                        </div>
+                    </section>
                 </div>
             `;
 
-            bindWaitingActions();
+            bindDynamicControls(game, moves, selfPlayer);
             return;
         }
 
@@ -516,15 +587,6 @@ export function renderMatchView(root, profile, gameId, options) {
 
             setLocalPlayerStatus("Player locale selezionato.", "success");
             await refreshGameState();
-        });
-    }
-
-    function bindWaitingActions() {
-        root.querySelector("#change-local-player-button")?.addEventListener("click", () => {
-            clearLocalPlayerId();
-            if (currentGame) {
-                renderGame(currentGame, currentMoves);
-            }
         });
     }
 
@@ -845,14 +907,10 @@ export function renderMatchView(root, profile, gameId, options) {
 
     window.addEventListener("keydown", onKeyDown);
     refreshGameState();
-    pollHandle = window.setInterval(() => {
-        refreshGameState();
-    }, POLL_INTERVAL_MS);
 
     return () => {
         disposed = true;
         window.removeEventListener("keydown", onKeyDown);
-        window.clearInterval(pollHandle);
     };
 }
 
