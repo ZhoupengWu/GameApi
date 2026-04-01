@@ -91,16 +91,8 @@ root.innerHTML = `
                 <h3 id="player-name">-</h3>
                 <dl class="player-meta">
                     <div>
-                        <dt>ID</dt>
-                        <dd id="player-id">-</dd>
-                    </div>
-                    <div>
                         <dt>API Key</dt>
                         <dd id="player-api-key">-</dd>
-                    </div>
-                    <div>
-                        <dt>Creato il</dt>
-                        <dd id="player-created-at">-</dd>
                     </div>
                 </dl>
             </section>
@@ -114,9 +106,7 @@ const submitButton = getRequiredElement("#submit-button", HTMLButtonElement);
 const statusElement = getRequiredElement("#status", HTMLParagraphElement);
 const playerCard = getRequiredElement("#player-card", HTMLElement);
 const playerName = getRequiredElement("#player-name", HTMLHeadingElement);
-const playerId = getRequiredElement("#player-id", HTMLElement);
 const playerApiKey = getRequiredElement("#player-api-key", HTMLElement);
-const playerCreatedAt = getRequiredElement("#player-created-at", HTMLElement);
 
 /**
  * @param {string} message
@@ -132,9 +122,7 @@ function setStatus(message, type = "idle") {
  */
 function renderPlayerCard(profile) {
     playerName.textContent = profile.username;
-    playerId.textContent = profile.id;
     playerApiKey.textContent = profile.apiKey;
-    playerCreatedAt.textContent = new Date(profile.createdAt).toLocaleString("it-IT");
     playerCard.classList.remove("hidden");
 }
 

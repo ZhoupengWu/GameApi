@@ -19,6 +19,21 @@
  */
 
 /**
+ * @typedef {Object} gamePlayer - Player data inside a game
+ * @property {string} gamePlayer.id - ID of the player in the game
+ * @property {string} gamePlayer.name - Display name of the player in the game
+ * @property {string} gamePlayer.joinedAt - Timestamp of when the player joined
+ */
+
+/**
+ * @typedef {Object} gameMove - Move data
+ * @property {string} gameMove.id - ID of the move
+ * @property {string} gameMove.playerId - ID of the player who made the move
+ * @property {Record<string, unknown>} gameMove.data - Payload of the move
+ * @property {string} gameMove.timestamp - Timestamp of when the move was recorded
+ */
+
+/**
  * Rappresents a player in the game system.
  * Automatically registers the player upon creation, manages the api key and provides methods for game creation, listing and joining.
  *
@@ -143,34 +158,58 @@ export class Player {
     }
 
     /**
+     * Execute an authenticated API request and normalize error handling.
+     * @template T
+     * @param {string} path
+     * @param {RequestInit} [options]
+     * @returns {Promise<T>}
+     */
+    async #request(path, options = {}) {
+        await this.#ensureReady();
+
+        const response = await fetch(path, {
+            ...options,
+            headers: {
+                "X-API-Key": this.#getApiKey(),
+                ...(options.headers || {})
+            }
+        });
+
+        if (!response.ok) {
+            let errorMessage = "Request failed";
+
+            try {
+                const errorData = await response.json();
+                errorMessage = errorData.error || errorData.message || errorMessage;
+            } catch {
+                errorMessage = response.statusText || errorMessage;
+            }
+
+            throw new Error(errorMessage);
+        }
+
+        if (response.status === 204) {
+            return /** @type {T} */ (undefined);
+        }
+
+        return /** @type {Promise<T>} */ (response.json());
+    }
+
+    /**
      * Create a game
      * @param {string} name_game name of the game
      * @returns {Promise<{message: string, game: game}>}
      */
     async createGame(name_game) {
-        await this.#ensureReady();
-
-        const response = await fetch("/games", {
+        return this.#request("/games", {
             method: "POST",
             headers: {
-                "X-API-Key": this.#getApiKey(),
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({
                 "name": name_game
             })
         });
-
-        if (!response.ok) {
-            throw new Error(`[ERROR] ${response}`);
-        }
-
-        /**
-         * @type {{message: string, game: game}}
-         */
-        const data = await response.json();
-
-        return data;
     }
 
     /**
@@ -178,24 +217,9 @@ export class Player {
      * @returns {Promise<Array<game>>}
      */
     async listGame() {
-        await this.#ensureReady();
-
-        const response = await fetch("/games", {
+        const data = await this.#request("/games", {
             method: "GET",
-            headers: {
-                "X-API-Key": this.#getApiKey(),
-                "Content-Type": "application/json"
-            }
         });
-
-        if (!response.ok) {
-            throw new Error(`[ERROR] ${response}`);
-        }
-
-        /**
-         * @type {{count: number, games: Array<game>}}
-         */
-        const data = await response.json();
 
         return data.games;
     }
@@ -206,24 +230,12 @@ export class Player {
      * @returns {Promise<game>}
      */
     async getGame(game_id) {
-        await this.#ensureReady();
-
-        const response = await fetch(`/games/${game_id}`, {
-            method: "GET",
-            headers: {
-                "X-API-Key": this.#getApiKey(),
-                "Content-Type": "application/json"
-            }
-        });
-
-        if (!response.ok) {
-            throw new Error(`[ERROR] ${response}`);
-        }
-
         /**
          * @type {{game: game}}
          */
-        const data = await response.json();
+        const data = await this.#request(`/games/${game_id}`, {
+            method: "GET"
+        });
 
         return data.game;
     }
@@ -236,12 +248,12 @@ export class Player {
      * @returns {Promise<game>}
      */
     async updateGame(game_id, new_name, new_status) {
-        await this.#ensureReady();
-
-        const response = await fetch(`/games/${game_id}`, {
+        /**
+         * @type {{game: game}}
+         */
+        const data = await this.#request(`/games/${game_id}`, {
             method: "PUT",
             headers: {
-                "X-API-Key": this.#getApiKey(),
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({
@@ -249,15 +261,6 @@ export class Player {
                 "status": new_status
             })
         });
-
-        if (!response.ok) {
-            throw new Error(`[ERROR] ${response}`);
-        }
-
-        /**
-         * @type {{message: string, game: game}}
-         */
-        const data = await response.json();
 
         return data.game;
     }
@@ -268,25 +271,100 @@ export class Player {
      * @returns {Promise<string>}
      */
     async deleteGame(game_id) {
-        await this.#ensureReady();
-
-        const response = await fetch(`/games/${game_id}`, {
-            method: "DELETE",
-            headers: {
-                "X-API-Key": this.#getApiKey(),
-                "Content-Type": "application/json"
-            }
+        const data = await this.#request(`/games/${game_id}`, {
+            method: "DELETE"
         });
 
-        if (!response.ok) {
-            throw new Error(`[ERROR] ${response}`);
-        }
-
-        /**
-         * @type {string} successful or error message
-         */
-        const data = await response.json();
-
         return data;
+    }
+
+    /**
+     * Add a player to a game.
+     * @param {string} game_id
+     * @param {string} player_name
+     * @returns {Promise<{message: string, player: gamePlayer}>}
+     */
+    async addPlayerToGame(game_id, player_name) {
+        return this.#request(`/games/${game_id}/players`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                "name": player_name
+            })
+        });
+    }
+
+    /**
+     * Get all players for a game.
+     * @param {string} game_id
+     * @returns {Promise<Array<gamePlayer>>}
+     */
+    async getGamePlayers(game_id) {
+        const data = await this.#request(`/games/${game_id}/players`, {
+            method: "GET"
+        });
+
+        return data.players;
+    }
+
+    /**
+     * Remove a player from a game.
+     * @param {string} game_id
+     * @param {string} player_id
+     * @returns {Promise<{message: string}>}
+     */
+    async removePlayerFromGame(game_id, player_id) {
+        return this.#request(`/games/${game_id}/players/${player_id}`, {
+            method: "DELETE"
+        });
+    }
+
+    /**
+     * Add a move to a game.
+     * @param {string} game_id
+     * @param {string} player_id
+     * @param {Record<string, unknown>} move_data
+     * @returns {Promise<{message: string, move: gameMove}>}
+     */
+    async addMoveToGame(game_id, player_id, move_data) {
+        return this.#request(`/games/${game_id}/moves`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                "playerId": player_id,
+                "data": move_data
+            })
+        });
+    }
+
+    /**
+     * Get all moves for a game.
+     * @param {string} game_id
+     * @returns {Promise<Array<gameMove>>}
+     */
+    async getGameMoves(game_id) {
+        const data = await this.#request(`/games/${game_id}/moves`, {
+            method: "GET"
+        });
+
+        return data.moves;
+    }
+
+    /**
+     * Get a single move for a game.
+     * @param {string} game_id
+     * @param {string} move_id
+     * @returns {Promise<gameMove>}
+     */
+    async getGameMove(game_id, move_id) {
+        const data = await this.#request(`/games/${game_id}/moves/${move_id}`, {
+            method: "GET"
+        });
+
+        return data.move;
     }
 }
