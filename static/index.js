@@ -33,6 +33,11 @@ class Player {
     #name_player;
 
     /**
+     * @type {Promise<void>}
+     */
+    #ready;
+
+    /**
      * @type {user}
      */
     // @ts-ignore
@@ -44,7 +49,7 @@ class Player {
      */
     constructor(name) {
         this.#name_player = name;
-        this.#register()
+        this.#ready = this.#register()
             .then(user => {
                 this.#player_information = user;
             })
@@ -66,7 +71,7 @@ class Player {
      * @returns {string}
      */
     #getApiKey() {
-        if (!this.#player_information.apiKey) {
+        if (!this.#player_information || !this.#player_information.apiKey) {
             throw new Error("[ERROR] API key is not initialized");
         }
 
@@ -74,11 +79,19 @@ class Player {
     }
 
     /**
+     * Wait until the player registration has completed
+     * @returns {Promise<void>}
+     */
+    async #ensureReady() {
+        await this.#ready;
+    }
+
+    /**
      * Register the user
      * @returns {Promise<user>} information of the player
      */
     async #register() {
-        const response = await fetch("http://127.0.0.1:3000/auth/register", {
+        const response = await fetch("/auth/register", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
@@ -107,6 +120,8 @@ class Player {
      * @returns {Promise<{message: string, game: game}>}
      */
     async createGame(name_game) {
+        await this.#ensureReady();
+
         const response = await fetch("/games", {
             method: "POST",
             headers: {
@@ -135,6 +150,8 @@ class Player {
      * @returns {Promise<Array<game>>}
      */
     async listGame() {
+        await this.#ensureReady();
+
         const response = await fetch("/games", {
             method: "GET",
             headers: {
@@ -161,6 +178,8 @@ class Player {
      * @returns {Promise<game>}
      */
     async getGame(game_id) {
+        await this.#ensureReady();
+
         const response = await fetch(`/games/${game_id}`, {
             method: "GET",
             headers: {
@@ -189,6 +208,8 @@ class Player {
      * @returns {Promise<game>}
      */
     async updateGame(game_id, new_name, new_status) {
+        await this.#ensureReady();
+
         const response = await fetch(`/games/${game_id}`, {
             method: "PUT",
             headers: {
@@ -219,6 +240,8 @@ class Player {
      * @returns {Promise<string>}
      */
     async deleteGame(game_id) {
+        await this.#ensureReady();
+
         const response = await fetch(`/games/${game_id}`, {
             method: "DELETE",
             headers: {
@@ -239,11 +262,3 @@ class Player {
         return data;
     }
 }
-
-const player1 = new Player("Alessia");
-const game = player1.createGame("lotto");
-game.then((data) => {
-    console.log(data);
-}).catch((err) => {
-    console.error(err);
-});
