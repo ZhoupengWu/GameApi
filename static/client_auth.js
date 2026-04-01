@@ -92,6 +92,21 @@ export class Player {
     }
 
     /**
+     * Create a client bound to a shared api key already distributed outside the app.
+     * @param {string} apiKey
+     * @param {string} [label]
+     * @returns {Player}
+     */
+    static fromApiKey(apiKey, label = "Sessione condivisa") {
+        return new Player(label, {
+            id: "shared-api-key-session",
+            username: label,
+            apiKey,
+            createdAt: new Date().toISOString()
+        });
+    }
+
+    /**
      * Get the name of the player
      * @returns {string}
      */
@@ -235,6 +250,9 @@ export class Player {
      * @returns {Promise<Array<game>>}
      */
     async listGame() {
+        /**
+         * @type {{count: number, games: Array<game>}}
+         */
         const data = await this.#request("/games", {
             method: "GET",
         });

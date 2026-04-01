@@ -19,9 +19,15 @@
 ## Frontend statico
 
 - `static/index.html`: pagina principale
-- `static/index.js`: logica client
+- `static/index.js`: bootstrap SPA frontend
 - `static/index.css`: stile custom
 - `static/client_auth.js`: wrapper browser per API
+- `static/session_storage.js`: sessione locale
+- `static/utils/dom.js`: helper DOM
+- `static/game/tetris_engine.js`: logica Tetris
+- `static/views/register_view.js`: accesso / registrazione
+- `static/views/lobby_view.js`: lobby
+- `static/views/match_view.js`: partita
 - `static/jsconfig.json`: type checking JS lato editor
 - `static/pages/splash.html`: pagina ausiliaria legacy / non integrata
 - `static/favicon.ico`: favicon

@@ -1,6 +1,8 @@
-import { getSavedSession, clearSavedSession, saveSession } from "./session_storage.js";
+import { clearSavedSession, getSavedSession, saveSession } from "./session_storage.js";
+import { renderMatchView } from "./views/match_view.js";
 import { renderLobbyView } from "./views/lobby_view.js";
 import { renderRegisterView } from "./views/register_view.js";
+import { getRequiredElement } from "./utils/dom.js";
 
 /**
  * @typedef {{
@@ -11,51 +13,64 @@ import { renderRegisterView } from "./views/register_view.js";
  * }} PlayerProfile
  */
 
-/**
- * Restituisce un elemento DOM tipizzato oppure fallisce subito.
- *
- * @template {Element} T
- * @param {string} selector
- * @param {new () => T} expectedType
- * @returns {T}
- */
-function getRequiredElement(selector, expectedType) {
-    const element = document.querySelector(selector);
+const root = getRequiredElement(document, "#app", HTMLDivElement);
+let cleanupCurrentView = () => {};
 
-    if (!(element instanceof expectedType)) {
-        throw new Error(`Required element not found: ${selector}`);
+/**
+ * @returns {string | null}
+ */
+function getRouteGameId() {
+    const hash = window.location.hash;
+
+    if (!hash.startsWith("#game=")) {
+        return null;
     }
 
-    return element;
+    return hash.slice("#game=".length).trim() || null;
 }
 
-const root = getRequiredElement("#app", HTMLDivElement);
+function renderApp() {
+    cleanupCurrentView();
+    cleanupCurrentView = () => {};
 
-/**
- * @param {PlayerProfile} profile
- */
-function showLobby(profile) {
-    renderLobbyView(root, profile, {
+    const savedSession = getSavedSession();
+
+    if (!savedSession) {
+        renderRegisterView(root, {
+            onRegistered(profile) {
+                saveSession(profile);
+                renderApp();
+            }
+        });
+        return;
+    }
+
+    const gameId = getRouteGameId();
+
+    if (gameId) {
+        cleanupCurrentView = renderMatchView(root, savedSession, gameId, {
+            onBack() {
+                window.location.hash = "";
+            },
+            onLogout() {
+                clearSavedSession();
+                window.location.hash = "";
+                renderApp();
+            }
+        });
+        return;
+    }
+
+    cleanupCurrentView = renderLobbyView(root, savedSession, {
         onLogout() {
             clearSavedSession();
-            showRegister();
+            renderApp();
+        },
+        onOpenGame(nextGameId) {
+            window.location.hash = `#game=${nextGameId}`;
         }
     });
 }
 
-function showRegister() {
-    renderRegisterView(root, {
-        onRegistered(profile) {
-            saveSession(profile);
-            showLobby(profile);
-        }
-    });
-}
-
-const savedSession = getSavedSession();
-
-if (savedSession) {
-    showLobby(savedSession);
-} else {
-    showRegister();
-}
+window.addEventListener("hashchange", renderApp);
+renderApp();

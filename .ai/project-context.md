@@ -6,7 +6,7 @@
 - Tipo: server Node.js con Express
 - Dominio attuale: backend REST per gestione utenti e partite, con frontend statico leggero
 - Gioco in focus: Tetris
-- Obiettivo frontend attuale: lobby / registrazione utente, non gameplay completo
+- Obiettivo frontend attuale: registrazione o accesso con API key condivisa, lobby e match Tetris a due
 
 ## Stack tecnico
 
@@ -67,6 +67,6 @@
 ## Stato attuale da ricordare
 
 - `static/index.html` include Bootstrap 4.3.1 via CDN, ma la UI corrente usa soprattutto CSS custom
-- `static/index.js` costruisce la schermata di registrazione via DOM string template
+- `static/index.js` gestisce il routing hash tra lobby e match
 - `static/client_auth.js` esporta `Player`
 - Il frontend salva la sessione locale del giocatore in `localStorage` con chiave `tetris-player-session`

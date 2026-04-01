@@ -1,4 +1,6 @@
 import { Player } from "../client_auth.js";
+import { createSharedSession } from "../session_storage.js";
+import { getRequiredElement } from "../utils/dom.js";
 
 /**
  * @typedef {{
@@ -69,6 +71,38 @@ export function renderRegisterView(root, options) {
 
                 <p id="status" class="status" role="status" aria-live="polite"></p>
 
+                <div class="divider-label">oppure</div>
+
+                <form id="shared-session-form" class="register-form">
+                    <label class="field">
+                        <span>API Key condivisa</span>
+                        <input
+                            id="shared-api-key"
+                            name="shared-api-key"
+                            type="text"
+                            autocomplete="off"
+                            placeholder="Incolla la chiave ricevuta dal proprietario"
+                            required
+                        >
+                    </label>
+
+                    <label class="field">
+                        <span>Etichetta sessione locale</span>
+                        <input
+                            id="shared-session-label"
+                            name="shared-session-label"
+                            type="text"
+                            maxlength="30"
+                            autocomplete="off"
+                            placeholder="es. Browser 2"
+                        >
+                    </label>
+
+                    <button id="shared-submit-button" class="secondary-button" type="submit">Usa API key esistente</button>
+                </form>
+
+                <p id="shared-status" class="status" role="status" aria-live="polite"></p>
+
                 <section id="player-card" class="player-card hidden" aria-live="polite">
                     <p class="panel-kicker">Sessione attiva</p>
                     <h3 id="player-name">-</h3>
@@ -88,6 +122,11 @@ export function renderRegisterView(root, options) {
     const usernameInput = getRequiredElement(root, "#username", HTMLInputElement);
     const submitButton = getRequiredElement(root, "#submit-button", HTMLButtonElement);
     const statusElement = getRequiredElement(root, "#status", HTMLParagraphElement);
+    const sharedForm = getRequiredElement(root, "#shared-session-form", HTMLFormElement);
+    const sharedApiKeyInput = getRequiredElement(root, "#shared-api-key", HTMLInputElement);
+    const sharedSessionLabelInput = getRequiredElement(root, "#shared-session-label", HTMLInputElement);
+    const sharedSubmitButton = getRequiredElement(root, "#shared-submit-button", HTMLButtonElement);
+    const sharedStatusElement = getRequiredElement(root, "#shared-status", HTMLParagraphElement);
     const playerCard = getRequiredElement(root, "#player-card", HTMLElement);
     const playerName = getRequiredElement(root, "#player-name", HTMLHeadingElement);
     const playerApiKey = getRequiredElement(root, "#player-api-key", HTMLElement);
@@ -99,6 +138,15 @@ export function renderRegisterView(root, options) {
     function setStatus(message, type = "idle") {
         statusElement.textContent = message;
         statusElement.dataset.state = type;
+    }
+
+    /**
+     * @param {string} message
+     * @param {"idle" | "success" | "error"} type
+     */
+    function setSharedStatus(message, type = "idle") {
+        sharedStatusElement.textContent = message;
+        sharedStatusElement.dataset.state = type;
     }
 
     /**
@@ -117,6 +165,16 @@ export function renderRegisterView(root, options) {
         submitButton.disabled = isLoading;
         usernameInput.disabled = isLoading;
         submitButton.textContent = isLoading ? "Registrazione..." : "Registrati";
+    }
+
+    /**
+     * @param {boolean} isLoading
+     */
+    function setSharedLoading(isLoading) {
+        sharedSubmitButton.disabled = isLoading;
+        sharedApiKeyInput.disabled = isLoading;
+        sharedSessionLabelInput.disabled = isLoading;
+        sharedSubmitButton.textContent = isLoading ? "Accesso..." : "Usa API key esistente";
     }
 
     form.addEventListener("submit", async (event) => {
@@ -147,21 +205,27 @@ export function renderRegisterView(root, options) {
             setLoading(false);
         }
     });
-}
 
-/**
- * @template {Element} T
- * @param {ParentNode} scope
- * @param {string} selector
- * @param {new () => T} expectedType
- * @returns {T}
- */
-function getRequiredElement(scope, selector, expectedType) {
-    const element = scope.querySelector(selector);
+    sharedForm.addEventListener("submit", (event) => {
+        event.preventDefault();
 
-    if (!(element instanceof expectedType)) {
-        throw new Error(`Required element not found: ${selector}`);
-    }
+        const apiKey = sharedApiKeyInput.value.trim();
+        const label = sharedSessionLabelInput.value.trim() || "Sessione condivisa";
 
-    return element;
+        if (!apiKey) {
+            setSharedStatus("Inserisci una API key valida.", "error");
+            return;
+        }
+
+        setSharedLoading(true);
+        setSharedStatus("Sessione condivisa attivata.", "success");
+
+        try {
+            const profile = createSharedSession(apiKey, label);
+            renderPlayerCard(profile);
+            options.onRegistered(profile);
+        } finally {
+            setSharedLoading(false);
+        }
+    });
 }

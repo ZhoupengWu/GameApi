@@ -1,4 +1,5 @@
 import { Player } from "../client_auth.js";
+import { escapeHtml, getRequiredElement } from "../utils/dom.js";
 
 /**
  * @typedef {{
@@ -14,7 +15,7 @@ import { Player } from "../client_auth.js";
  *     id: string,
  *     name: string,
  *     ownerId: string,
- *     players: Array<unknown>,
+ *     players: Array<{id: string, userId?: string | null, name: string}>,
  *     moves: Array<unknown>,
  *     status: string,
  *     createdAt: string,
@@ -25,17 +26,18 @@ import { Player } from "../client_auth.js";
 /**
  * @param {HTMLDivElement} root
  * @param {PlayerProfile} profile
- * @param {{ onLogout: () => void }} options
+ * @param {{ onLogout: () => void, onOpenGame: (gameId: string) => void }} options
+ * @returns {() => void}
  */
 export function renderLobbyView(root, profile, options) {
     root.innerHTML = `
         <main class="dashboard-shell">
             <section class="dashboard-hero">
                 <div>
-                    <p class="eyebrow">Sessione attiva</p>
+                    <p class="eyebrow">Lobby Tetris</p>
                     <h1 class="dashboard-title">Benvenuto ${escapeHtml(profile.username)}</h1>
                     <p class="hero-copy">
-                        La tua API key è salvata localmente. Da qui puoi creare una nuova partita Tetris e rivedere quelle che possiedi.
+                        Usa la stessa API key su due browser o due tab diversi, poi dentro ogni partita scegli il nome del player locale.
                     </p>
                 </div>
 
@@ -56,15 +58,7 @@ export function renderLobbyView(root, profile, options) {
                     <form id="create-game-form" class="register-form">
                         <label class="field">
                             <span>Nome partita</span>
-                            <input
-                                id="game-name"
-                                name="game-name"
-                                type="text"
-                                minlength="1"
-                                maxlength="50"
-                                placeholder="es. Tetris Ranked Room"
-                                required
-                            >
+                            <input id="game-name" type="text" maxlength="50" placeholder="es. Tetris Duel" required>
                         </label>
 
                         <button id="create-game-button" type="submit">Crea partita</button>
@@ -83,6 +77,13 @@ export function renderLobbyView(root, profile, options) {
                     </div>
 
                     <p id="games-status" class="status" role="status" aria-live="polite"></p>
+                    <form id="open-game-form" class="register-form compact-form">
+                        <label class="field">
+                            <span>Apri partita da ID</span>
+                            <input id="open-game-id" type="text" placeholder="es. id lobby esistente">
+                        </label>
+                        <button id="open-game-button" class="secondary-button" type="submit">Apri</button>
+                    </form>
                     <div id="games-list" class="games-list"></div>
                 </article>
             </section>
@@ -91,22 +92,24 @@ export function renderLobbyView(root, profile, options) {
 
     const player = Player.fromProfile(profile);
     const logoutButton = getRequiredElement(root, "#logout-button", HTMLButtonElement);
-    const refreshButton = getRequiredElement(root, "#refresh-games-button", HTMLButtonElement);
     const createForm = getRequiredElement(root, "#create-game-form", HTMLFormElement);
-    const gameNameInput = getRequiredElement(root, "#game-name", HTMLInputElement);
+    const createGameInput = getRequiredElement(root, "#game-name", HTMLInputElement);
     const createButton = getRequiredElement(root, "#create-game-button", HTMLButtonElement);
     const createStatus = getRequiredElement(root, "#create-status", HTMLParagraphElement);
+    const refreshGamesButton = getRequiredElement(root, "#refresh-games-button", HTMLButtonElement);
+    const openGameForm = getRequiredElement(root, "#open-game-form", HTMLFormElement);
+    const openGameInput = getRequiredElement(root, "#open-game-id", HTMLInputElement);
     const gamesStatus = getRequiredElement(root, "#games-status", HTMLParagraphElement);
     const gamesList = getRequiredElement(root, "#games-list", HTMLDivElement);
 
     /**
-     * @param {HTMLParagraphElement} target
+     * @param {HTMLParagraphElement} element
      * @param {string} message
      * @param {"idle" | "success" | "error"} type
      */
-    function setStatus(target, message, type = "idle") {
-        target.textContent = message;
-        target.dataset.state = type;
+    function setStatus(element, message, type = "idle") {
+        element.textContent = message;
+        element.dataset.state = type;
     }
 
     /**
@@ -114,22 +117,14 @@ export function renderLobbyView(root, profile, options) {
      */
     function setCreateLoading(isLoading) {
         createButton.disabled = isLoading;
-        gameNameInput.disabled = isLoading;
+        createGameInput.disabled = isLoading;
         createButton.textContent = isLoading ? "Creazione..." : "Crea partita";
-    }
-
-    /**
-     * @param {boolean} isLoading
-     */
-    function setRefreshLoading(isLoading) {
-        refreshButton.disabled = isLoading;
-        refreshButton.textContent = isLoading ? "Aggiornamento..." : "Aggiorna";
     }
 
     /**
      * @param {Array<GameSummary>} games
      */
-    function renderGames(games) {
+    function renderAccessibleGames(games) {
         if (games.length === 0) {
             gamesList.innerHTML = `
                 <div class="empty-state">
@@ -137,21 +132,19 @@ export function renderLobbyView(root, profile, options) {
                     <p class="muted-copy">Usa il pannello a sinistra per aprire la tua prima lobby.</p>
                 </div>
             `;
-
             return;
         }
 
         gamesList.innerHTML = games.map((game) => `
             <article class="game-card">
                 <div class="game-card-header">
-                    <h3>${escapeHtml(game.name)}</h3>
+                    <div>
+                        <h3>${escapeHtml(game.name)}</h3>
+                        <p class="game-subtitle">${escapeHtml(game.id)}</p>
+                    </div>
                     <span class="status-pill">${escapeHtml(game.status)}</span>
                 </div>
                 <dl class="game-meta">
-                    <div>
-                        <dt>ID</dt>
-                        <dd>${escapeHtml(game.id)}</dd>
-                    </div>
                     <div>
                         <dt>Giocatori</dt>
                         <dd>${String(game.players.length)}</dd>
@@ -160,52 +153,51 @@ export function renderLobbyView(root, profile, options) {
                         <dt>Mosse</dt>
                         <dd>${String(game.moves.length)}</dd>
                     </div>
-                    <div>
-                        <dt>Aggiornata</dt>
-                        <dd>${formatDate(game.updatedAt)}</dd>
-                    </div>
                 </dl>
+                <button class="secondary-button lobby-action" type="button" data-open-game="${escapeHtml(game.id)}">Apri partita</button>
             </article>
         `).join("");
     }
 
-    async function loadGames() {
-        setRefreshLoading(true);
+    async function loadAccessibleGames() {
+        refreshGamesButton.disabled = true;
         setStatus(gamesStatus, "Caricamento partite...", "idle");
 
         try {
             const games = await player.listGame();
-            renderGames(games);
-
-            if (games.length > 0) {
-                setStatus(gamesStatus, `${games.length} partite caricate.`, "success");
-            } else {
-                setStatus(gamesStatus, "Nessuna partita presente per questo utente.", "idle");
-            }
+            renderAccessibleGames(games);
+            setStatus(gamesStatus, `${games.length} partite caricate.`, games.length > 0 ? "success" : "idle");
         } catch (error) {
             const message = error instanceof Error ? error.message : "Errore sconosciuto";
-            setStatus(gamesStatus, message, "error");
             gamesList.innerHTML = "";
+            setStatus(gamesStatus, message, "error");
         } finally {
-            setRefreshLoading(false);
+            refreshGamesButton.disabled = false;
         }
+    }
+
+    function openGameById() {
+        const gameId = openGameInput.value.trim();
+
+        if (!gameId) {
+            setStatus(gamesStatus, "Inserisci un id partita valido.", "error");
+            return;
+        }
+
+        options.onOpenGame(gameId);
     }
 
     logoutButton.addEventListener("click", () => {
         options.onLogout();
     });
 
-    refreshButton.addEventListener("click", () => {
-        loadGames();
-    });
-
     createForm.addEventListener("submit", async (event) => {
         event.preventDefault();
 
-        const gameName = gameNameInput.value.trim();
+        const name = createGameInput.value.trim();
 
-        if (gameName.length < 1) {
-            setStatus(createStatus, "Il nome della partita è obbligatorio.", "error");
+        if (!name) {
+            setStatus(createStatus, "Il nome della partita e obbligatorio.", "error");
             return;
         }
 
@@ -213,10 +205,11 @@ export function renderLobbyView(root, profile, options) {
         setStatus(createStatus, "Creazione partita in corso...", "idle");
 
         try {
-            const result = await player.createGame(gameName);
-            gameNameInput.value = "";
+            const result = await player.createGame(name);
             setStatus(createStatus, `Partita creata: ${result.game.name}`, "success");
-            await loadGames();
+            createGameInput.value = "";
+            await loadAccessibleGames();
+            options.onOpenGame(result.game.id);
         } catch (error) {
             const message = error instanceof Error ? error.message : "Errore sconosciuto";
             setStatus(createStatus, message, "error");
@@ -225,43 +218,30 @@ export function renderLobbyView(root, profile, options) {
         }
     });
 
-    loadGames();
-}
+    refreshGamesButton.addEventListener("click", () => {
+        loadAccessibleGames();
+    });
 
-/**
- * @template {Element} T
- * @param {ParentNode} scope
- * @param {string} selector
- * @param {new () => T} expectedType
- * @returns {T}
- */
-function getRequiredElement(scope, selector, expectedType) {
-    const element = scope.querySelector(selector);
+    openGameForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        openGameById();
+    });
 
-    if (!(element instanceof expectedType)) {
-        throw new Error(`Required element not found: ${selector}`);
-    }
+    gamesList.addEventListener("click", (event) => {
+        const target = event.target;
 
-    return element;
-}
+        if (!(target instanceof HTMLElement)) {
+            return;
+        }
 
-/**
- * @param {string} value
- * @returns {string}
- */
-function escapeHtml(value) {
-    return value
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#39;");
-}
+        const gameId = target.dataset.openGame;
 
-/**
- * @param {string} isoDate
- * @returns {string}
- */
-function formatDate(isoDate) {
-    return new Date(isoDate).toLocaleString("it-IT");
+        if (gameId) {
+            options.onOpenGame(gameId);
+        }
+    });
+
+    loadAccessibleGames();
+
+    return () => {};
 }

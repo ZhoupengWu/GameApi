@@ -12,9 +12,15 @@
 ## File importanti
 
 - `static/index.html`: shell HTML principale
-- `static/index.js`: render pagina e logica registrazione
+- `static/index.js`: router hash-based leggero per lobby e match
 - `static/index.css`: look Tetris / arcade
 - `static/client_auth.js`: client API browser-side
+- `static/session_storage.js`: persistenza sessione locale
+- `static/utils/dom.js`: helper DOM condivisi
+- `static/game/tetris_engine.js`: regole Tetris lato client
+- `static/views/register_view.js`: registrazione o accesso via API key condivisa
+- `static/views/lobby_view.js`: creazione lobby e apertura match
+- `static/views/match_view.js`: gameplay a due usando stessa API key
 - `static/pages/splash.html`: pagina secondaria molto semplice, attualmente separata dal flusso principale
 - `static/img/undo.ico`: asset usato in `static/pages/splash.html`
 
@@ -28,11 +34,11 @@
 
 ## UI attuale
 
-- Tema visivo: Tetris lobby / arcade
-- Hero panel a sinistra, card registrazione a destra
-- Tetromini decorativi renderizzati via HTML/CSS
-- Stato della richiesta mostrato in pagina
-- Card sessione visibile dopo registrazione o ripristino da `localStorage`
+- Schermata iniziale con due ingressi: registrazione nuova API key o incolla API key condivisa
+- Lobby con creazione partita, lista partite e apertura tramite id
+- Match view dove ogni tab seleziona il proprio player locale nella lobby
+- Gameplay Tetris con tre pedine (`I`, `O`, `T`) e doppia griglia
+- Polling periodico delle mosse salvate nel backend
 
 ## Vincoli tecnici
 
@@ -46,7 +52,9 @@
 - Username duplicati vengono rifiutati con errore `User already exists`
 - Username vuoti vengono rifiutati come `Invalid username`
 - Le route `/games` richiedono sempre `X-API-Key`
-- Il frontend attuale registra utenti ma non ha ancora una vera schermata per creare o gestire partite
+- `GET /games` mostra le lobby create dall'utente proprietario della API key
+- `POST /games/:gameId/players` viene usata per registrare i nomi player locali dentro la partita
+- `POST /games/:gameId/moves` viene usata per sincronizzare lo stato Tetris
 
 ## Attenzioni utili
 

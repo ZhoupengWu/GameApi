@@ -47,3 +47,17 @@ export function saveSession(profile) {
 export function clearSavedSession() {
     localStorage.removeItem(STORAGE_KEY);
 }
+
+/**
+ * @param {string} apiKey
+ * @param {string} [label]
+ * @returns {PlayerProfile}
+ */
+export function createSharedSession(apiKey, label = "Sessione condivisa") {
+    return {
+        id: "shared-api-key-session",
+        username: label,
+        apiKey,
+        createdAt: new Date().toISOString()
+    };
+}

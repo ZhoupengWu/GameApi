@@ -22,7 +22,7 @@ npm start
 The API listens on `PORT` (default: `3000`).
 
 ## Frontend
-Il client statico di registrazione Tetris e servito dal backend Express su:
+Il client statico Tetris e servito dal backend Express su:
 
 ```text
 http://localhost:3000/frontend
@@ -32,10 +32,13 @@ L'entry point browser è `static/index.js`, mentre il client per autenticazione 
 
 Struttura frontend attuale:
 
-- `static/index.js`: bootstrap e cambio vista.
+- `static/index.js`: bootstrap SPA con routing hash tra lobby e partita.
 - `static/session_storage.js`: persistenza locale della sessione.
+- `static/utils/dom.js`: helper DOM condivisi.
+- `static/game/tetris_engine.js`: logica Tetris client-side.
 - `static/views/register_view.js`: schermata di registrazione.
-- `static/views/lobby_view.js`: schermata post-login con creazione partita e lista lobby.
+- `static/views/lobby_view.js`: schermata post-login con creazione lobby e apertura partita.
+- `static/views/match_view.js`: partita Tetris a due con player locale per tab.
 
 ## API Docs
 Swagger UI is available at:
@@ -73,6 +76,7 @@ curl -X POST http://localhost:3000/games \
 Metodi disponibili:
 
 - `waitUntilReady()`: restituisce il profilo registrato con `username` e `apiKey`.
+- `fromApiKey(apiKey, label)`: crea una sessione client partendo da una API key gia condivisa.
 - `createGame(name)`: crea una partita.
 - `listGame()`: elenca le partite dell'utente autenticato.
 - `getGame(gameId)`: legge una partita specifica.
@@ -97,3 +101,20 @@ const created = await player.createGame("Tetris Lobby");
 console.log(profile.apiKey);
 console.log(created.game.id);
 ```
+
+## Multiplayer con API key condivisa
+Il flusso previsto dal frontend e questo:
+
+1. Un browser registra un utente e ottiene la `API key`.
+2. La stessa `API key` viene incollata nel secondo browser o tab usando la schermata iniziale.
+3. Entrambe le finestre aprono la stessa lobby.
+4. Dentro la partita ogni finestra sceglie il proprio nome player locale.
+5. Le mosse vengono salvate tramite le API esistenti `/games`, `/games/:gameId/players` e `/games/:gameId/moves`.
+
+## Tetris implementato
+
+- Due griglie `8x8`, una per player.
+- Tre pedine selezionabili: `I`, `O`, `T`.
+- Movimento via tastiera o pulsanti.
+- Se completi una o piu righe o colonne, l'altro player riceve blocchi casuali di disturbo.
+- La sincronizzazione tra i due browser avviene tramite polling delle mosse salvate nelle API.
