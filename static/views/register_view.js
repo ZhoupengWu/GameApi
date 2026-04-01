@@ -13,7 +13,12 @@ import { getRequiredElement } from "../utils/dom.js";
 
 /**
  * @param {HTMLDivElement} root
- * @param {{ onRegistered: (profile: PlayerProfile) => void }} options
+ * @param {{
+ *   existingSession?: PlayerProfile | null,
+ *   onRegistered: (profile: PlayerProfile) => void,
+ *   onResumeSession: () => void,
+ *   onForgetSession: () => void
+ * }} options
  */
 export function renderRegisterView(root, options) {
     root.innerHTML = `
@@ -70,6 +75,18 @@ export function renderRegisterView(root, options) {
                 </form>
 
                 <p id="status" class="status" role="status" aria-live="polite"></p>
+
+                ${options.existingSession ? `
+                    <section class="player-card">
+                        <p class="panel-kicker">Sessione salvata</p>
+                        <h3>${options.existingSession.username}</h3>
+                        <p class="welcome-copy">Puoi rientrare subito senza creare un nuovo utente.</p>
+                        <div class="match-actions">
+                            <button id="resume-session-button" type="button">Rientra con questo utente</button>
+                            <button id="forget-session-button" class="secondary-button" type="button">Dimentica sessione</button>
+                        </div>
+                    </section>
+                ` : ""}
 
                 <div class="divider-label">oppure</div>
 
@@ -130,6 +147,8 @@ export function renderRegisterView(root, options) {
     const playerCard = getRequiredElement(root, "#player-card", HTMLElement);
     const playerName = getRequiredElement(root, "#player-name", HTMLHeadingElement);
     const playerApiKey = getRequiredElement(root, "#player-api-key", HTMLElement);
+    const resumeSessionButton = root.querySelector("#resume-session-button");
+    const forgetSessionButton = root.querySelector("#forget-session-button");
 
     /**
      * @param {string} message
@@ -184,7 +203,7 @@ export function renderRegisterView(root, options) {
 
         if (username.length < 1) {
             setStatus("Il nickname deve avere almeno 1 carattere.", "error");
-            
+
             return;
         }
 
@@ -227,5 +246,13 @@ export function renderRegisterView(root, options) {
         } finally {
             setSharedLoading(false);
         }
+    });
+
+    resumeSessionButton?.addEventListener("click", () => {
+        options.onResumeSession();
+    });
+
+    forgetSessionButton?.addEventListener("click", () => {
+        options.onForgetSession();
     });
 }

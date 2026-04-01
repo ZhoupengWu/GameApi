@@ -15,6 +15,7 @@ import { getRequiredElement } from "./utils/dom.js";
 
 const root = getRequiredElement(document, "#app", HTMLDivElement);
 let cleanupCurrentView = () => {};
+let showSessionChooser = false;
 
 /**
  * @returns {string | null}
@@ -35,10 +36,21 @@ function renderApp() {
 
     const savedSession = getSavedSession();
 
-    if (!savedSession) {
+    if (!savedSession || showSessionChooser) {
         renderRegisterView(root, {
+            existingSession: savedSession,
             onRegistered(profile) {
                 saveSession(profile);
+                showSessionChooser = false;
+                renderApp();
+            },
+            onResumeSession() {
+                showSessionChooser = false;
+                renderApp();
+            },
+            onForgetSession() {
+                clearSavedSession();
+                showSessionChooser = false;
                 renderApp();
             }
         });
@@ -53,8 +65,8 @@ function renderApp() {
                 window.location.hash = "";
             },
             onLogout() {
-                clearSavedSession();
                 window.location.hash = "";
+                showSessionChooser = true;
                 renderApp();
             }
         });
@@ -63,7 +75,7 @@ function renderApp() {
 
     cleanupCurrentView = renderLobbyView(root, savedSession, {
         onLogout() {
-            clearSavedSession();
+            showSessionChooser = true;
             renderApp();
         },
         onOpenGame(nextGameId) {

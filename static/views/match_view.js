@@ -11,6 +11,7 @@ import {
 import { escapeHtml, getRequiredElement } from "../utils/dom.js";
 
 const POLL_INTERVAL_MS = 2000;
+const SHARED_SESSION_LABEL = "Sessione condivisa";
 
 /**
  * @typedef {{
@@ -54,12 +55,12 @@ export function renderMatchView(root, profile, gameId, options) {
                 </div>
 
                 <div class="player-card">
-                    <p class="panel-kicker">Controlli</p>
-                    <p class="muted-copy">Freccie per muovere, Q/E o R per ruotare, 1/2/3 per scegliere la pedina, Invio per piazzare.</p>
-                    <div class="match-actions">
-                        <button id="back-button" class="secondary-button" type="button">Torna alla lobby</button>
-                        <button id="logout-button" class="secondary-button" type="button">Esci</button>
-                    </div>
+                        <p class="panel-kicker">Controlli</p>
+                        <p class="muted-copy">Freccie per muovere, Q/E o R per ruotare, 1/2/3 per scegliere la pedina, Invio per piazzare.</p>
+                        <div class="match-actions">
+                        <button id="back-button" class="secondary-button" type="button">Schermata principale</button>
+                        <button id="logout-button" class="secondary-button" type="button">Cambia sessione</button>
+                        </div>
                 </div>
             </section>
 
@@ -99,6 +100,9 @@ export function renderMatchView(root, profile, gameId, options) {
     let isSubmitting = false;
     let pollHandle = 0;
     let disposed = false;
+    let isEditingLocalPlayerName = false;
+    let localPlayerDraftName = "";
+    let isAutoSelectingLocalPlayer = false;
 
     /**
      * @param {string} message
@@ -125,6 +129,13 @@ export function renderMatchView(root, profile, gameId, options) {
     }
 
     /**
+     * @returns {string}
+     */
+    function getLocalPlayerNameStorageKey() {
+        return `tetris-local-player-name:${profile.apiKey}:${gameId}`;
+    }
+
+    /**
      * @returns {string | null}
      */
     function getLocalPlayerId() {
@@ -140,6 +151,84 @@ export function renderMatchView(root, profile, gameId, options) {
 
     function clearLocalPlayerId() {
         sessionStorage.removeItem(getLocalPlayerStorageKey());
+    }
+
+    /**
+     * @returns {string}
+     */
+    function getSuggestedLocalPlayerName() {
+        const rememberedName = localStorage.getItem(getLocalPlayerNameStorageKey())?.trim();
+
+        if (rememberedName) {
+            return rememberedName;
+        }
+
+        if (profile.id !== "shared-api-key-session") {
+            return profile.username;
+        }
+
+        return profile.username === SHARED_SESSION_LABEL ? "" : profile.username;
+    }
+
+    /**
+     * @param {string} playerName
+     */
+    function saveLocalPlayerName(playerName) {
+        const normalizedName = playerName.trim();
+
+        if (!normalizedName) {
+            localStorage.removeItem(getLocalPlayerNameStorageKey());
+            return;
+        }
+
+        localStorage.setItem(getLocalPlayerNameStorageKey(), normalizedName);
+    }
+
+    /**
+     * @param {GameDetails} game
+     * @returns {Promise<boolean>}
+     */
+    async function ensureLocalPlayerSelection(game) {
+        const selectedPlayerId = getLocalPlayerId();
+
+        if (selectedPlayerId && game.players.some((entry) => entry.id === selectedPlayerId)) {
+            return false;
+        }
+
+        if (isAutoSelectingLocalPlayer) {
+            return false;
+        }
+
+        const preferredName = getSuggestedLocalPlayerName();
+
+        if (!preferredName) {
+            return false;
+        }
+
+        const matchingPlayer = game.players.find((entry) => entry.name.toLowerCase() === preferredName.toLowerCase()) || null;
+
+        if (matchingPlayer) {
+            saveLocalPlayerId(matchingPlayer.id);
+            saveLocalPlayerName(matchingPlayer.name);
+            localPlayerDraftName = matchingPlayer.name;
+            return true;
+        }
+
+        if (game.players.length >= 2 || profile.username === SHARED_SESSION_LABEL) {
+            return false;
+        }
+
+        isAutoSelectingLocalPlayer = true;
+
+        try {
+            const result = await player.addPlayerToGame(gameId, preferredName);
+            saveLocalPlayerId(result.player.id);
+            saveLocalPlayerName(result.player.name);
+            localPlayerDraftName = result.player.name;
+            return true;
+        } finally {
+            isAutoSelectingLocalPlayer = false;
+        }
     }
 
     /**
@@ -288,6 +377,7 @@ export function renderMatchView(root, profile, gameId, options) {
      */
     function renderPlayerSetup(game) {
         const canCreateNewPlayer = game.players.length < 2;
+        const draftName = localPlayerDraftName || getSuggestedLocalPlayerName();
 
         matchContent.innerHTML = `
             <div class="player-setup-grid">
@@ -299,7 +389,7 @@ export function renderMatchView(root, profile, gameId, options) {
                     <form id="local-player-form" class="register-form">
                         <label class="field">
                             <span>Nome player locale</span>
-                            <input id="local-player-name" type="text" maxlength="20" placeholder="es. Player Rosso" ${canCreateNewPlayer ? "" : "disabled"}>
+                            <input id="local-player-name" type="text" maxlength="20" value="${escapeHtml(draftName)}" placeholder="es. Player Rosso" ${canCreateNewPlayer ? "" : "disabled"}>
                         </label>
                         <button id="local-player-submit" type="submit" ${canCreateNewPlayer ? "" : "disabled"}>Usa questo nome</button>
                     </form>
@@ -343,6 +433,21 @@ export function renderMatchView(root, profile, gameId, options) {
             localPlayerStatus.dataset.state = type;
         }
 
+        if (localPlayerNameInput instanceof HTMLInputElement) {
+            localPlayerNameInput.addEventListener("input", () => {
+                localPlayerDraftName = localPlayerNameInput.value;
+            });
+
+            localPlayerNameInput.addEventListener("focus", () => {
+                isEditingLocalPlayerName = true;
+            });
+
+            localPlayerNameInput.addEventListener("blur", () => {
+                isEditingLocalPlayerName = false;
+                localPlayerDraftName = localPlayerNameInput.value;
+            });
+        }
+
         localPlayerForm?.addEventListener("submit", async (event) => {
             event.preventDefault();
 
@@ -357,11 +462,15 @@ export function renderMatchView(root, profile, gameId, options) {
                 return;
             }
 
+            localPlayerDraftName = name;
+            saveLocalPlayerName(name);
+
             try {
                 const matchingPlayer = game.players.find((entry) => entry.name.toLowerCase() === name.toLowerCase()) || null;
 
                 if (matchingPlayer) {
                     saveLocalPlayerId(matchingPlayer.id);
+                    saveLocalPlayerName(matchingPlayer.name);
                     setLocalPlayerStatus(`Player selezionato: ${matchingPlayer.name}`, "success");
                     await refreshGameState();
                     return;
@@ -375,6 +484,7 @@ export function renderMatchView(root, profile, gameId, options) {
                 setLocalPlayerStatus("Creazione player in corso...", "idle");
                 const result = await player.addPlayerToGame(gameId, name);
                 saveLocalPlayerId(result.player.id);
+                saveLocalPlayerName(result.player.name);
                 setLocalPlayerStatus(`Player creato: ${result.player.name}`, "success");
                 await refreshGameState();
             } catch (error) {
@@ -397,6 +507,13 @@ export function renderMatchView(root, profile, gameId, options) {
             }
 
             saveLocalPlayerId(gamePlayerId);
+            const selectedPlayer = game.players.find((entry) => entry.id === gamePlayerId);
+
+            if (selectedPlayer) {
+                saveLocalPlayerName(selectedPlayer.name);
+                localPlayerDraftName = selectedPlayer.name;
+            }
+
             setLocalPlayerStatus("Player locale selezionato.", "success");
             await refreshGameState();
         });
@@ -631,10 +748,28 @@ export function renderMatchView(root, profile, gameId, options) {
         setRefreshLoading(true);
 
         try {
-            const [game, moves] = await Promise.all([
+            let [game, moves] = await Promise.all([
                 player.getGame(gameId),
                 player.getGameMoves(gameId)
             ]);
+
+            const localPlayerSelectionChanged = await ensureLocalPlayerSelection(game);
+
+            if (localPlayerSelectionChanged) {
+                [game, moves] = await Promise.all([
+                    player.getGame(gameId),
+                    player.getGameMoves(gameId)
+                ]);
+            }
+
+            currentGame = game;
+            currentMoves = moves;
+            gameNameHeading.textContent = game.name;
+
+            if (isEditingLocalPlayerName && !getLocalPlayerId()) {
+                setStatus(`Partita sincronizzata. Mosse totali: ${moves.length}.`, "success");
+                return;
+            }
 
             renderGame(game, moves);
             setStatus(`Partita sincronizzata. Mosse totali: ${moves.length}.`, "success");

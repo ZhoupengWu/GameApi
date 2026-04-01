@@ -44,7 +44,11 @@ export function renderLobbyView(root, profile, options) {
                 <div class="player-card">
                     <p class="panel-kicker">API Key</p>
                     <p class="api-key-value">${escapeHtml(profile.apiKey)}</p>
-                    <button id="logout-button" class="secondary-button" type="button">Esci</button>
+                    <div class="match-actions">
+                        <button id="copy-api-key-button" type="button">Copia token</button>
+                        <button id="logout-button" class="secondary-button" type="button">Cambia sessione</button>
+                    </div>
+                    <p id="copy-status" class="status" role="status" aria-live="polite"></p>
                 </div>
             </section>
 
@@ -91,7 +95,9 @@ export function renderLobbyView(root, profile, options) {
     `;
 
     const player = Player.fromProfile(profile);
+    const copyApiKeyButton = getRequiredElement(root, "#copy-api-key-button", HTMLButtonElement);
     const logoutButton = getRequiredElement(root, "#logout-button", HTMLButtonElement);
+    const copyStatus = getRequiredElement(root, "#copy-status", HTMLParagraphElement);
     const createForm = getRequiredElement(root, "#create-game-form", HTMLFormElement);
     const createGameInput = getRequiredElement(root, "#game-name", HTMLInputElement);
     const createButton = getRequiredElement(root, "#create-game-button", HTMLButtonElement);
@@ -189,6 +195,15 @@ export function renderLobbyView(root, profile, options) {
 
     logoutButton.addEventListener("click", () => {
         options.onLogout();
+    });
+
+    copyApiKeyButton.addEventListener("click", async () => {
+        try {
+            await navigator.clipboard.writeText(profile.apiKey);
+            setStatus(copyStatus, "Token copiato negli appunti.", "success");
+        } catch {
+            setStatus(copyStatus, "Copia non riuscita. Copia il token manualmente.", "error");
+        }
     });
 
     createForm.addEventListener("submit", async (event) => {
