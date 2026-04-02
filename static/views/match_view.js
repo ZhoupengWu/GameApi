@@ -114,6 +114,7 @@ export function renderMatchView(root, profile, gameId, options) {
     let isAutoSelectingLocalPlayer = false;
     let isCompletingMatch = false;
     let finalizedMatchStatus = "";
+    let refreshRequestId = 0;
     /** @type {BroadcastChannel | null} */
     let syncChannel = null;
 
@@ -1062,11 +1063,12 @@ export function renderMatchView(root, profile, gameId, options) {
                 renderBoardLayout(currentGame, nextState, nextOwnState, selfPlayer, opponentPlayer, nextOpponentState);
             }
 
-            await player.addMoveToGame(currentGame.id, localPlayerId, {
+            const persistedMoveResult = await player.addMoveToGame(currentGame.id, localPlayerId, {
                 type: "tetris-turn",
                 gameState: nextState,
                 summary
             });
+            currentMoves = [...previousMoves, persistedMoveResult.move];
 
             broadcastMatchUpdate("move-placed");
             setStatus("Mossa registrata.", "success");
@@ -1091,11 +1093,17 @@ export function renderMatchView(root, profile, gameId, options) {
             return;
         }
 
+        const requestId = ++refreshRequestId;
+
         try {
             let [game, moves] = await Promise.all([
                 player.getGame(gameId),
                 player.getGameMoves(gameId)
             ]);
+
+            if (disposed || requestId !== refreshRequestId) {
+                return;
+            }
 
             const localPlayerSelectionChanged = await ensureLocalPlayerSelection(game);
 
@@ -1104,6 +1112,10 @@ export function renderMatchView(root, profile, gameId, options) {
                     player.getGame(gameId),
                     player.getGameMoves(gameId)
                 ]);
+
+                if (disposed || requestId !== refreshRequestId) {
+                    return;
+                }
             }
 
             currentGame = game;

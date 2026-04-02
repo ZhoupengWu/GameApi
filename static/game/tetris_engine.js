@@ -216,47 +216,16 @@ export function applyMove(state, userId, pieceId, rotation, position) {
         actorState.board[position.y + cellY][position.x + cellX] = 1;
     }
 
-    const { clearedRows, clearedColumns } = resolveCompletedLines(actorState.board);
+    const initialResolution = resolveCompletedLines(actorState.board);
+    const clearedRows = [...initialResolution.clearedRows];
+    const clearedColumns = [...initialResolution.clearedColumns];
 
     actorState.linesCleared += clearedRows.length + clearedColumns.length;
     actorState.upcomingPieces.splice(upcomingPieceIndex, 1);
     refillUpcomingPieces(actorState.upcomingPieces);
 
     const garbageTargets = [];
-    const garbageCount = clearedRows.length + clearedColumns.length;
-
-    if (garbageCount > 0) {
-        for (const [targetUserId, targetState] of Object.entries(nextState.players)) {
-            if (targetUserId === userId) {
-                continue;
-            }
-
-            const placements = [];
-            const garbageClearedRows = [];
-            const garbageClearedColumns = [];
-
-            for (let index = 0; index < garbageCount; index += 1) {
-                const placedPiece = addRandomGarbagePiece(targetState.board);
-
-                if (!placedPiece) {
-                    break;
-                }
-
-                placements.push(placedPiece);
-                const resolvedLines = resolveCompletedLines(targetState.board);
-                garbageClearedRows.push(...resolvedLines.clearedRows);
-                garbageClearedColumns.push(...resolvedLines.clearedColumns);
-            }
-
-            targetState.garbageReceived += placements.length;
-            garbageTargets.push({
-                targetUserId,
-                placements,
-                clearedRows: garbageClearedRows,
-                clearedColumns: garbageClearedColumns
-            });
-        }
-    }
+    propagateGarbage(nextState, userId, clearedRows.length + clearedColumns.length, garbageTargets);
 
     nextState.currentTurnUserId = getNextTurnUserId(activePlayerIds, userId);
     nextState.version += 1;
@@ -457,6 +426,59 @@ function resolveCompletedLines(board) {
         clearedRows,
         clearedColumns
     };
+}
+
+/**
+ * @param {TetrisGameState} state
+ * @param {string} sourceUserId
+ * @param {number} garbageCount
+ * @param {Array<{targetUserId: string, placements: Array<{pieceId: string, rotation: number, position: {x: number, y: number}}>, clearedRows: Array<number>, clearedColumns: Array<number>}>} garbageTargets
+ */
+function propagateGarbage(state, sourceUserId, garbageCount, garbageTargets) {
+    if (garbageCount <= 0) {
+        return;
+    }
+
+    for (const [targetUserId, targetState] of Object.entries(state.players)) {
+        if (targetUserId === sourceUserId) {
+            continue;
+        }
+
+        const placements = [];
+        const garbageClearedRows = [];
+        const garbageClearedColumns = [];
+
+        for (let index = 0; index < garbageCount; index += 1) {
+            const placedPiece = addRandomGarbagePiece(targetState.board);
+
+            if (!placedPiece) {
+                break;
+            }
+
+            placements.push(placedPiece);
+            const resolvedLines = resolveCompletedLines(targetState.board);
+
+            if (resolvedLines.clearedRows.length > 0 || resolvedLines.clearedColumns.length > 0) {
+                garbageClearedRows.push(...resolvedLines.clearedRows);
+                garbageClearedColumns.push(...resolvedLines.clearedColumns);
+                targetState.linesCleared += resolvedLines.clearedRows.length + resolvedLines.clearedColumns.length;
+                propagateGarbage(
+                    state,
+                    targetUserId,
+                    resolvedLines.clearedRows.length + resolvedLines.clearedColumns.length,
+                    garbageTargets
+                );
+            }
+        }
+
+        targetState.garbageReceived += placements.length;
+        garbageTargets.push({
+            targetUserId,
+            placements,
+            clearedRows: garbageClearedRows,
+            clearedColumns: garbageClearedColumns
+        });
+    }
 }
 
 /**
