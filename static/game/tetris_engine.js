@@ -216,20 +216,31 @@ export function applyMove(state, userId, pieceId, rotation, position) {
     actorState.upcomingPieces.splice(upcomingPieceIndex, 1);
     refillUpcomingPieces(actorState.upcomingPieces);
 
-    const awardedPieces = [];
-    const awardedPieceCount = clearedRows.length + clearedColumns.length;
+    const garbageTargets = [];
+    const garbageCount = clearedRows.length + clearedColumns.length;
 
-    if (awardedPieceCount > 0) {
+    if (garbageCount > 0) {
         for (const [targetUserId, targetState] of Object.entries(nextState.players)) {
             if (targetUserId === userId) {
                 continue;
             }
 
-            const pieces = addAwardedPieces(targetState.upcomingPieces, awardedPieceCount);
-            targetState.garbageReceived += pieces.length;
-            awardedPieces.push({
+            const placements = [];
+
+            for (let index = 0; index < garbageCount; index += 1) {
+                const placedPiece = addRandomGarbagePiece(targetState.board);
+
+                if (!placedPiece) {
+                    break;
+                }
+
+                placements.push(placedPiece);
+            }
+
+            targetState.garbageReceived += placements.length;
+            garbageTargets.push({
                 targetUserId,
-                pieces
+                placements
             });
         }
     }
@@ -245,7 +256,7 @@ export function applyMove(state, userId, pieceId, rotation, position) {
             position,
             clearedRows,
             clearedColumns,
-            awardedPieces,
+            garbageTargets,
             currentTurnUserId: nextState.currentTurnUserId
         }
     };
@@ -402,19 +413,49 @@ function getPieceBounds(cells) {
 }
 
 /**
- * @param {Array<string>} upcomingPieces
- * @param {number} count
- * @returns {Array<string>}
+ * @param {number[][]} board
+ * @returns {{pieceId: string, rotation: number, position: {x: number, y: number}} | null}
  */
-function addAwardedPieces(upcomingPieces, count) {
-    const pieces = [];
+function addRandomGarbagePiece(board) {
+    const candidates = [];
 
-    for (let index = 0; index < count; index += 1) {
-        pieces.push(getRandomPieceId());
+    for (const pieceId of Object.keys(PIECES)) {
+        for (let rotation = 0; rotation < 4; rotation += 1) {
+            const cells = getPieceCells(pieceId, rotation);
+            const bounds = getPieceBounds(cells);
+
+            for (let y = 0; y <= board.length - bounds.height; y += 1) {
+                for (let x = 0; x <= board[0].length - bounds.width; x += 1) {
+                    const position = { x, y };
+
+                    if (canPlacePiece(board, cells, position)) {
+                        candidates.push({
+                            pieceId,
+                            rotation,
+                            position,
+                            cells
+                        });
+                    }
+                }
+            }
+        }
     }
 
-    upcomingPieces.push(...pieces);
-    return pieces;
+    if (candidates.length === 0) {
+        return null;
+    }
+
+    const selected = candidates[Math.floor(Math.random() * candidates.length)];
+
+    for (const [cellX, cellY] of selected.cells) {
+        board[selected.position.y + cellY][selected.position.x + cellX] = 2;
+    }
+
+    return {
+        pieceId: selected.pieceId,
+        rotation: selected.rotation,
+        position: selected.position
+    };
 }
 
 /**

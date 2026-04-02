@@ -423,7 +423,7 @@ export function renderMatchView(root, profile, gameId, options) {
 
                     <div class="match-sidebar-card">
                         <p class="panel-kicker">Pezzi disponibili</p>
-                        <p class="muted-copy">Trascina un pezzo sulla griglia quando e il tuo turno. Se completi una riga o colonna, l'avversario riceve nuovi pezzi in coda.</p>
+                        <p class="muted-copy">Trascina un pezzo sulla griglia quando e il tuo turno. Se completi una riga o colonna, sull'avversario compare un pezzo casuale in una posizione valida.</p>
                         ${renderPieceQueueHtml(ownState.upcomingPieces, isLocalTurn && canMoveAtAll)}
                     </div>
 
@@ -460,12 +460,12 @@ export function renderMatchView(root, profile, gameId, options) {
                         <p class="panel-kicker">${opponentPlayer ? "Effetti" : "Stato lobby"}</p>
                         <p class="muted-copy">
                             ${opponentPlayer
-                                ? "Quando l'avversario completa righe o colonne, ricevi un pezzo casuale in coda per ogni linea completata."
+                                ? "Quando l'avversario completa righe o colonne, nella tua griglia compare un pezzo casuale completo in una posizione valida per ogni linea completata."
                                 : "Apri un secondo browser o tab, usa la stessa API key e scegli il nome dell'avversario in questa stessa lobby."}
                         </p>
                         <p class="muted-copy">
                             ${opponentPlayer
-                                ? `Pezzi ricevuti dall'avversario: <strong>${String(ownState.garbageReceived)}</strong>`
+                                ? `Pezzi disturbo ricevuti: <strong>${String(ownState.garbageReceived)}</strong>`
                                 : "Quando l'altro player entra o piazza un blocco, questa schermata si sincronizza automaticamente."}
                         </p>
                     </div>

@@ -117,6 +117,6 @@ Il flusso previsto dal frontend e questo:
 - Coda pezzi composta da `I`, `O`, `T`, servita dal backend statico su `/frontend`.
 - Interazione via drag and drop dal pannello pezzi alla propria griglia.
 - Turni alternati tra i due player, con indicatore del turno corrente in partita.
-- Se completi una o piu righe o colonne, l'altro player riceve un pezzo casuale aggiuntivo in coda per ogni linea completata.
+- Se completi una o piu righe o colonne, nella griglia dell'altro player compare un pezzo casuale completo in una posizione valida casuale per ogni linea completata.
 - I blocchi gia piazzati restano fissi sulla griglia finche non vengono rimossi dal completamento di una riga o colonna.
 - La sincronizzazione tra i browser usa le mosse salvate via API e aggiornamenti locali via `BroadcastChannel` o evento `storage`.
