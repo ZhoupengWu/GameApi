@@ -1,16 +1,16 @@
 import { Player } from "../client_auth.js";
 import {
     applyMove,
-    clampPosition,
     findFirstValidPosition,
     getLatestGameState,
     getPieceCatalog,
-    getPreviewCells,
-    hasAnyMove
+    getPieceCellsForRender,
+    getPreviewCells
 } from "../game/tetris_engine.js";
 import { escapeHtml, getRequiredElement } from "../utils/dom.js";
 
 const SHARED_SESSION_LABEL = "Sessione condivisa";
+const MATCH_SYNC_KEY_PREFIX = "tetris-match-sync";
 
 /**
  * @typedef {{
@@ -35,6 +35,17 @@ const SHARED_SESSION_LABEL = "Sessione condivisa";
  */
 
 /**
+ * @typedef {{
+ *     userId: string,
+ *     name: string,
+ *     board: number[][],
+ *     upcomingPieces: Array<string>,
+ *     linesCleared: number,
+ *     garbageReceived: number
+ * }} PlayerBoardState
+ */
+
+/**
  * @param {HTMLDivElement} root
  * @param {PlayerProfile} profile
  * @param {string} gameId
@@ -49,27 +60,26 @@ export function renderMatchView(root, profile, gameId, options) {
                     <p class="eyebrow">Partita Tetris</p>
                     <h1 class="dashboard-title">Lobby ${escapeHtml(gameId)}</h1>
                     <p class="hero-copy">
-                        Usate la stessa API key su due browser o due tab. Dentro questa lobby ogni finestra sceglie il proprio nome giocatore locale.
+                        Ogni player riceve tre pezzi generati dal sistema. Trascina un pezzo sulla tua griglia per bloccarlo.
                     </p>
                 </div>
 
                 <div class="player-card">
-                        <p class="panel-kicker">Controlli</p>
-                        <p class="muted-copy">Freccie per muovere, Q/E o R per ruotare, 1/2/3 per scegliere la pedina, Invio per piazzare.</p>
-                        <div class="match-actions">
+                    <p class="panel-kicker">Navigazione</p>
+                    <p class="muted-copy">La partita si sincronizza automaticamente quando un player entra, esce o piazza un blocco.</p>
+                    <div class="match-actions">
                         <button id="back-button" class="secondary-button" type="button">Schermata principale</button>
                         <button id="logout-button" class="secondary-button" type="button">Cambia sessione</button>
-                        </div>
+                    </div>
                 </div>
             </section>
 
             <section class="register-panel">
-                <div class="panel-header panel-header-inline">
+                <div class="panel-header">
                     <div>
                         <p class="panel-kicker">Stato match</p>
                         <h2 id="game-name-heading">Caricamento...</h2>
                     </div>
-                    <button id="refresh-match-button" class="secondary-button" type="button">Aggiorna</button>
                 </div>
 
                 <p id="match-status" class="status" role="status" aria-live="polite"></p>
@@ -81,15 +91,13 @@ export function renderMatchView(root, profile, gameId, options) {
     const player = Player.fromProfile(profile);
     const backButton = getRequiredElement(root, "#back-button", HTMLButtonElement);
     const logoutButton = getRequiredElement(root, "#logout-button", HTMLButtonElement);
-    const refreshButton = getRequiredElement(root, "#refresh-match-button", HTMLButtonElement);
     const statusElement = getRequiredElement(root, "#match-status", HTMLParagraphElement);
     const gameNameHeading = getRequiredElement(root, "#game-name-heading", HTMLHeadingElement);
     const matchContent = getRequiredElement(root, "#match-content", HTMLDivElement);
 
     const localState = {
-        selectedPieceId: "I",
-        rotation: 0,
-        position: { x: 0, y: 0 }
+        draggedPieceId: null,
+        previewPosition: null
     };
 
     /** @type {GameDetails | null} */
@@ -101,6 +109,8 @@ export function renderMatchView(root, profile, gameId, options) {
     let isEditingLocalPlayerName = false;
     let localPlayerDraftName = "";
     let isAutoSelectingLocalPlayer = false;
+    /** @type {BroadcastChannel | null} */
+    let syncChannel = null;
 
     /**
      * @param {string} message
@@ -112,11 +122,10 @@ export function renderMatchView(root, profile, gameId, options) {
     }
 
     /**
-     * @param {boolean} isLoading
+     * @returns {string}
      */
-    function setRefreshLoading(isLoading) {
-        refreshButton.disabled = isLoading;
-        refreshButton.textContent = isLoading ? "Aggiornamento..." : "Aggiorna";
+    function getMatchSyncChannelName() {
+        return `${MATCH_SYNC_KEY_PREFIX}:${gameId}`;
     }
 
     /**
@@ -183,6 +192,59 @@ export function renderMatchView(root, profile, gameId, options) {
     }
 
     /**
+     * @param {string} reason
+     */
+    function broadcastMatchUpdate(reason) {
+        const payload = {
+            reason,
+            gameId,
+            timestamp: Date.now()
+        };
+
+        if (syncChannel) {
+            syncChannel.postMessage(payload);
+        }
+
+        localStorage.setItem(getMatchSyncChannelName(), JSON.stringify(payload));
+    }
+
+    function clearPlacementPreview() {
+        localState.draggedPieceId = null;
+        localState.previewPosition = null;
+    }
+
+    /**
+     * @param {string} pieceId
+     * @param {number} x
+     * @param {number} y
+     */
+    function setPlacementPreview(pieceId, x, y) {
+        localState.draggedPieceId = pieceId;
+        localState.previewPosition = { x, y };
+    }
+
+    /**
+     * @param {PlayerBoardState} ownState
+     * @returns {Array<{x: number, y: number}>}
+     */
+    function getCurrentPreviewCells(ownState) {
+        if (!localState.draggedPieceId || !localState.previewPosition) {
+            return [];
+        }
+
+        return getPreviewCells(ownState.board, localState.draggedPieceId, 0, localState.previewPosition);
+    }
+
+    /**
+     * @param {number[][]} board
+     * @param {Array<string>} upcomingPieces
+     * @returns {boolean}
+     */
+    function hasPlayablePiece(board, upcomingPieces) {
+        return upcomingPieces.some((pieceId) => findFirstValidPosition(board, pieceId, 0) !== null);
+    }
+
+    /**
      * @param {GameDetails} game
      * @returns {Promise<boolean>}
      */
@@ -223,10 +285,166 @@ export function renderMatchView(root, profile, gameId, options) {
             saveLocalPlayerId(result.player.id);
             saveLocalPlayerName(result.player.name);
             localPlayerDraftName = result.player.name;
+            broadcastMatchUpdate("player-added");
             return true;
         } finally {
             isAutoSelectingLocalPlayer = false;
         }
+    }
+
+    /**
+     * @param {Array<string>} upcomingPieces
+     * @returns {string}
+     */
+    function renderPieceQueueHtml(upcomingPieces) {
+        if (upcomingPieces.length === 0) {
+            return `
+                <div class="empty-state">
+                    <p>Nessun pezzo disponibile.</p>
+                </div>
+            `;
+        }
+
+        return `
+            <div id="pieces-picker" class="pieces-picker">
+                ${upcomingPieces.map((pieceId) => `
+                    <button
+                        type="button"
+                        class="piece-card"
+                        data-piece-id="${escapeHtml(pieceId)}"
+                        aria-label="Pezzo ${escapeHtml(pieceId)}"
+                        title="${escapeHtml(pieceId)}"
+                        draggable="true"
+                    >
+                        ${renderPieceMiniBoard(pieceId)}
+                    </button>
+                `).join("")}
+            </div>
+        `;
+    }
+
+    /**
+     * @param {string} pieceId
+     * @returns {string}
+     */
+    function renderPieceMiniBoard(pieceId) {
+        const cells = getPieceCellsForRender(pieceId, 0);
+        const occupied = new Set(cells.map(([x, y]) => `${x}:${y}`));
+
+        return `
+            <span class="piece-mini-board" aria-hidden="true">
+                ${Array.from({ length: 16 }, (_, index) => {
+                    const x = index % 4;
+                    const y = Math.floor(index / 4);
+
+                    return `
+                        <span class="piece-mini-cell ${occupied.has(`${x}:${y}`) ? "piece-mini-cell-filled" : ""}"></span>
+                    `;
+                }).join("")}
+            </span>
+        `;
+    }
+
+    /**
+     * @param {PlayerBoardState} ownState
+     */
+    function updateOwnBoardPreview(ownState) {
+        const ownBoard = root.querySelector("#own-board");
+
+        if (!(ownBoard instanceof HTMLDivElement)) {
+            return;
+        }
+
+        ownBoard.innerHTML = renderBoardHtml(ownState.board, getCurrentPreviewCells(ownState), true);
+    }
+
+    /**
+     * @param {GameDetails} game
+     * @param {PlayerBoardState} ownState
+     * @param {{id: string, name: string}} selfPlayer
+     * @param {{id: string, name: string} | null} opponentPlayer
+     * @param {PlayerBoardState | null} opponentState
+     */
+    function renderBoardLayout(game, ownState, selfPlayer, opponentPlayer, opponentState) {
+        const previewCells = getCurrentPreviewCells(ownState);
+        const canMoveAtAll = hasPlayablePiece(ownState.board, ownState.upcomingPieces);
+
+        matchContent.innerHTML = `
+            <div class="match-player-banner">
+                <div class="match-player-badge">
+                    <span class="panel-kicker">Stai giocando come</span>
+                    <strong>${escapeHtml(selfPlayer.name)}</strong>
+                </div>
+                <div class="match-player-actions">
+                    <button id="change-local-player-button" class="secondary-button" type="button">Cambia player locale</button>
+                    <button id="remove-local-player-button" class="secondary-button" type="button">Rimuovi player</button>
+                </div>
+            </div>
+
+            <div class="match-grid">
+                <section class="board-section">
+                    <div class="panel-header panel-header-inline">
+                        <div>
+                            <p class="panel-kicker">La tua griglia</p>
+                            <h3>${escapeHtml(selfPlayer.name)}</h3>
+                        </div>
+                        <div class="score-card">
+                            <span>Linee</span>
+                            <strong>${String(ownState.linesCleared)}</strong>
+                        </div>
+                    </div>
+
+                    <div class="match-sidebar-card">
+                        <p class="panel-kicker">Pezzi disponibili</p>
+                        <p class="muted-copy">Trascina uno dei tre pezzi sulla griglia. I blocchi gia piazzati restano fissi.</p>
+                        ${renderPieceQueueHtml(ownState.upcomingPieces)}
+                    </div>
+
+                    <div id="own-board" class="board" aria-label="Griglia personale">
+                        ${renderBoardHtml(ownState.board, previewCells, true)}
+                    </div>
+
+                    <p class="status ${canMoveAtAll ? "" : "status-inline-error"}" data-state="${canMoveAtAll ? "idle" : "error"}">
+                        ${canMoveAtAll
+                            ? "Posiziona un pezzo trascinandolo sulla tua griglia."
+                            : "Nessuno dei tre pezzi disponibili entra nella griglia attuale."}
+                    </p>
+                </section>
+
+                <section class="board-section">
+                    <div class="panel-header panel-header-inline">
+                        <div>
+                            <p class="panel-kicker">Griglia avversaria</p>
+                            <h3>${escapeHtml(opponentPlayer ? opponentPlayer.name : "In attesa del secondo player")}</h3>
+                        </div>
+                        <div class="score-card">
+                            <span>Linee</span>
+                            <strong>${String(opponentState ? opponentState.linesCleared : 0)}</strong>
+                        </div>
+                    </div>
+
+                    <div class="board" aria-label="Griglia avversaria">
+                        ${renderBoardHtml(opponentState ? opponentState.board : createEmptyBoard(), [], false)}
+                    </div>
+
+                    <div class="match-sidebar-card">
+                        <p class="panel-kicker">${opponentPlayer ? "Effetti" : "Stato lobby"}</p>
+                        <p class="muted-copy">
+                            ${opponentPlayer
+                                ? "Quando l'avversario completa righe o colonne, nella tua griglia arriva un blocco casuale di disturbo per ogni linea completata."
+                                : "Apri un secondo browser o tab, usa la stessa API key e scegli il nome dell'avversario in questa stessa lobby."}
+                        </p>
+                        <p class="muted-copy">
+                            ${opponentPlayer
+                                ? `Disturbi ricevuti: <strong>${String(ownState.garbageReceived)}</strong>`
+                                : "Quando l'altro player entra o piazza un blocco, questa schermata si sincronizza automaticamente."}
+                        </p>
+                    </div>
+                </section>
+            </div>
+        `;
+
+        bindBoardInteractions(game, selfPlayer, ownState);
     }
 
     /**
@@ -256,191 +474,7 @@ export function renderMatchView(root, profile, gameId, options) {
             return;
         }
 
-        syncSelectionWithBoard(ownState.board);
-        const previewCells = getPreviewCells(ownState.board, localState.selectedPieceId, localState.rotation, localState.position);
-        const canPlace = previewCells.length > 0;
-        const canMoveAtAll = hasAnyMove(ownState.board);
-
-        if (!opponentPlayer) {
-            matchContent.innerHTML = `
-                <div class="match-player-banner">
-                    <div class="match-player-badge">
-                        <span class="panel-kicker">Stai giocando come</span>
-                        <strong>${escapeHtml(selfPlayer.name)}</strong>
-                    </div>
-                    <div class="match-player-actions">
-                        <button id="change-local-player-button" class="secondary-button" type="button">Cambia player locale</button>
-                        <button id="remove-local-player-button" class="secondary-button" type="button">Rimuovi player</button>
-                    </div>
-                </div>
-
-                <div class="match-grid">
-                    <section class="board-section">
-                        <div class="panel-header panel-header-inline">
-                            <div>
-                                <p class="panel-kicker">La tua griglia</p>
-                                <h3>${escapeHtml(selfPlayer.name)}</h3>
-                            </div>
-                            <div class="score-card">
-                                <span>Linee</span>
-                                <strong>${String(ownState.linesCleared)}</strong>
-                            </div>
-                        </div>
-
-                        <div id="pieces-picker" class="pieces-picker">
-                            ${getPieceCatalog().map((piece, index) => `
-                                <button
-                                    type="button"
-                                    class="piece-chip ${piece.id === localState.selectedPieceId ? "piece-chip-active" : ""}"
-                                    data-piece-id="${escapeHtml(piece.id)}"
-                                >
-                                    ${index + 1}. ${escapeHtml(piece.label)}
-                                </button>
-                            `).join("")}
-                        </div>
-
-                        <div id="own-board" class="board" aria-label="Griglia personale">
-                            ${renderBoardHtml(ownState.board, previewCells, true)}
-                        </div>
-
-                        <div class="control-cluster">
-                            <div class="direction-pad">
-                                <button type="button" class="secondary-button" data-control="up">Su</button>
-                                <div class="direction-row">
-                                    <button type="button" class="secondary-button" data-control="left">Sinistra</button>
-                                    <button type="button" class="secondary-button" data-control="down">Giu</button>
-                                    <button type="button" class="secondary-button" data-control="right">Destra</button>
-                                </div>
-                            </div>
-                            <div class="rotation-pad">
-                                <button type="button" class="secondary-button" data-control="rotate-left">Ruota -90</button>
-                                <button type="button" class="secondary-button" data-control="rotate-right">Ruota +90</button>
-                                <button type="button" id="place-piece-button" ${canPlace && !isSubmitting ? "" : "disabled"}>Blocca pedina</button>
-                            </div>
-                        </div>
-
-                        <p class="status ${canMoveAtAll ? "" : "status-inline-error"}" data-state="${canMoveAtAll ? "idle" : "error"}">
-                            ${canMoveAtAll ? "Il secondo player non e ancora entrato. Puoi comunque preparare e giocare sulla tua griglia." : "Nessuna pedina disponibile entra piu nella griglia attuale."}
-                        </p>
-                    </section>
-
-                    <section class="board-section">
-                        <div class="panel-header panel-header-inline">
-                            <div>
-                                <p class="panel-kicker">Griglia avversaria</p>
-                                <h3>In attesa del secondo player</h3>
-                            </div>
-                            <div class="score-card">
-                                <span>Linee</span>
-                                <strong>0</strong>
-                            </div>
-                        </div>
-
-                        <div class="board" aria-label="Griglia avversaria in attesa">
-                            ${renderBoardHtml(createEmptyBoard(), [], false)}
-                        </div>
-
-                        <div class="match-sidebar-card">
-                            <p class="panel-kicker">Stato lobby</p>
-                            <p class="muted-copy">Apri un secondo browser o tab, usa la stessa API key e scegli il nome dell'avversario in questa stessa lobby.</p>
-                            <p class="muted-copy">Se l'altro player e gia entrato altrove, usa il bottone Aggiorna per sincronizzare la partita.</p>
-                        </div>
-                    </section>
-                </div>
-            `;
-
-            bindDynamicControls(game, moves, selfPlayer);
-            return;
-        }
-
-        matchContent.innerHTML = `
-            <div class="match-player-banner">
-                <div class="match-player-badge">
-                    <span class="panel-kicker">Stai giocando come</span>
-                    <strong>${escapeHtml(selfPlayer.name)}</strong>
-                </div>
-                <div class="match-player-actions">
-                    <button id="change-local-player-button" class="secondary-button" type="button">Cambia player locale</button>
-                    <button id="remove-local-player-button" class="secondary-button" type="button">Rimuovi player</button>
-                </div>
-            </div>
-
-            <div class="match-grid">
-                <section class="board-section">
-                    <div class="panel-header panel-header-inline">
-                        <div>
-                            <p class="panel-kicker">La tua griglia</p>
-                            <h3>${escapeHtml(selfPlayer.name)}</h3>
-                        </div>
-                        <div class="score-card">
-                            <span>Linee</span>
-                            <strong>${String(ownState.linesCleared)}</strong>
-                        </div>
-                    </div>
-
-                    <div id="pieces-picker" class="pieces-picker">
-                        ${getPieceCatalog().map((piece, index) => `
-                            <button
-                                type="button"
-                                class="piece-chip ${piece.id === localState.selectedPieceId ? "piece-chip-active" : ""}"
-                                data-piece-id="${escapeHtml(piece.id)}"
-                            >
-                                ${index + 1}. ${escapeHtml(piece.label)}
-                            </button>
-                        `).join("")}
-                    </div>
-
-                    <div id="own-board" class="board" aria-label="Griglia personale">
-                        ${renderBoardHtml(ownState.board, previewCells, true)}
-                    </div>
-
-                    <div class="control-cluster">
-                        <div class="direction-pad">
-                            <button type="button" class="secondary-button" data-control="up">Su</button>
-                            <div class="direction-row">
-                                <button type="button" class="secondary-button" data-control="left">Sinistra</button>
-                                <button type="button" class="secondary-button" data-control="down">Giu</button>
-                                <button type="button" class="secondary-button" data-control="right">Destra</button>
-                            </div>
-                        </div>
-                        <div class="rotation-pad">
-                            <button type="button" class="secondary-button" data-control="rotate-left">Ruota -90</button>
-                            <button type="button" class="secondary-button" data-control="rotate-right">Ruota +90</button>
-                            <button type="button" id="place-piece-button" ${canPlace && !isSubmitting ? "" : "disabled"}>Blocca pedina</button>
-                        </div>
-                    </div>
-
-                    <p class="status ${canMoveAtAll ? "" : "status-inline-error"}" data-state="${canMoveAtAll ? "idle" : "error"}">
-                        ${canMoveAtAll ? "Scegli una pedina e posizionala sulla tua griglia." : "Nessuna pedina disponibile entra piu nella griglia attuale."}
-                    </p>
-                </section>
-
-                <section class="board-section">
-                    <div class="panel-header panel-header-inline">
-                        <div>
-                            <p class="panel-kicker">Griglia avversaria</p>
-                            <h3>${escapeHtml(opponentPlayer.name)}</h3>
-                        </div>
-                        <div class="score-card">
-                            <span>Linee</span>
-                            <strong>${String(opponentState ? opponentState.linesCleared : 0)}</strong>
-                        </div>
-                    </div>
-
-                    <div class="board" aria-label="Griglia avversaria">
-                        ${renderBoardHtml(opponentState ? opponentState.board : createEmptyBoard(), [], false)}
-                    </div>
-
-                    <div class="match-sidebar-card">
-                        <p class="panel-kicker">Effetti</p>
-                        <p class="muted-copy">Quando l'avversario completa righe o colonne, nella tua griglia arriva un blocco casuale di disturbo per ogni linea completata.</p>
-                        <p class="muted-copy">Disturbi ricevuti: <strong>${String(ownState.garbageReceived)}</strong></p>
-                    </div>
-                </section>
-            </div>
-        `;
-
-        bindDynamicControls(game, moves, selfPlayer);
+        renderBoardLayout(game, ownState, selfPlayer, opponentPlayer, opponentState);
     }
 
     /**
@@ -543,7 +577,7 @@ export function renderMatchView(root, profile, gameId, options) {
                     saveLocalPlayerId(matchingPlayer.id);
                     saveLocalPlayerName(matchingPlayer.name);
                     setLocalPlayerStatus(`Player selezionato: ${matchingPlayer.name}`, "success");
-                    await refreshGameState();
+                    renderGame(game, currentMoves);
                     return;
                 }
 
@@ -557,6 +591,7 @@ export function renderMatchView(root, profile, gameId, options) {
                 saveLocalPlayerId(result.player.id);
                 saveLocalPlayerName(result.player.name);
                 setLocalPlayerStatus(`Player creato: ${result.player.name}`, "success");
+                broadcastMatchUpdate("player-added");
                 await refreshGameState();
             } catch (error) {
                 const message = error instanceof Error ? error.message : "Errore sconosciuto";
@@ -564,7 +599,7 @@ export function renderMatchView(root, profile, gameId, options) {
             }
         });
 
-        existingPlayersList?.addEventListener("click", async (event) => {
+        existingPlayersList?.addEventListener("click", (event) => {
             const target = event.target;
 
             if (!(target instanceof HTMLElement)) {
@@ -586,112 +621,146 @@ export function renderMatchView(root, profile, gameId, options) {
             }
 
             setLocalPlayerStatus("Player locale selezionato.", "success");
-            await refreshGameState();
+            renderGame(game, currentMoves);
         });
     }
 
     /**
-     * @param {number[][]} board
-     */
-    function syncSelectionWithBoard(board) {
-        localState.position = clampPosition(board, localState.selectedPieceId, localState.rotation, localState.position);
-
-        if (getPreviewCells(board, localState.selectedPieceId, localState.rotation, localState.position).length > 0) {
-            return;
-        }
-
-        for (const piece of getPieceCatalog()) {
-            for (const rotation of [0, 1, 2, 3]) {
-                const position = findFirstValidPosition(board, piece.id, rotation);
-
-                if (position) {
-                    localState.selectedPieceId = piece.id;
-                    localState.rotation = rotation;
-                    localState.position = position;
-                    return;
-                }
-            }
-        }
-    }
-
-    /**
      * @param {GameDetails} game
-     * @param {Array<{id: string, playerId: string, data: Record<string, unknown>, timestamp: string}>} moves
      * @param {{id: string, name: string}} selfPlayer
+     * @param {PlayerBoardState} ownState
      */
-    function bindDynamicControls(game, moves, selfPlayer) {
-        const ownBoard = root.querySelector("#own-board");
+    function bindBoardInteractions(game, selfPlayer, ownState) {
         const piecesPicker = root.querySelector("#pieces-picker");
-        const placeButton = root.querySelector("#place-piece-button");
+        const ownBoard = root.querySelector("#own-board");
         const changeLocalPlayerButton = root.querySelector("#change-local-player-button");
         const removeLocalPlayerButton = root.querySelector("#remove-local-player-button");
 
-        piecesPicker?.addEventListener("click", (event) => {
+        piecesPicker?.addEventListener("dragstart", (event) => {
             const target = event.target;
 
             if (!(target instanceof HTMLElement)) {
                 return;
             }
 
-            const pieceId = target.dataset.pieceId;
+            const pieceButton = target.closest("[data-piece-id]");
+
+            if (!(pieceButton instanceof HTMLElement)) {
+                return;
+            }
+
+            const pieceId = pieceButton.dataset.pieceId;
 
             if (!pieceId) {
                 return;
             }
 
-            localState.selectedPieceId = pieceId;
-            localState.rotation = 0;
-            renderGame(game, moves);
+            const dragEvent = /** @type {DragEvent} */ (event);
+            const pieceMiniBoard = pieceButton.querySelector(".piece-mini-board");
+            dragEvent.dataTransfer?.setData("text/plain", pieceId);
+            dragEvent.dataTransfer?.setData("application/x-tetris-piece", pieceId);
+
+            if (pieceMiniBoard instanceof HTMLElement) {
+                const { width, height } = pieceMiniBoard.getBoundingClientRect();
+                dragEvent.dataTransfer?.setDragImage(pieceMiniBoard, width / 2, height / 2);
+            } else {
+                dragEvent.dataTransfer?.setDragImage(pieceButton, 24, 24);
+            }
+
+            localState.draggedPieceId = pieceId;
+            localState.previewPosition = null;
         });
 
-        ownBoard?.addEventListener("click", (event) => {
-            const target = event.target;
+        piecesPicker?.addEventListener("dragend", () => {
+            clearPlacementPreview();
+            updateOwnBoardPreview(ownState);
+        });
+
+        ownBoard?.addEventListener("dragover", (event) => {
+            const dragEvent = /** @type {DragEvent} */ (event);
+            const target = dragEvent.target;
 
             if (!(target instanceof HTMLElement)) {
                 return;
             }
 
-            const x = target.dataset.cellX;
-            const y = target.dataset.cellY;
+            const cell = target.closest("[data-cell-x][data-cell-y]");
 
-            if (x === undefined || y === undefined) {
+            if (!(cell instanceof HTMLElement)) {
                 return;
             }
 
-            localState.position = {
-                x: Number(x),
-                y: Number(y)
+            const pieceId = dragEvent.dataTransfer?.getData("application/x-tetris-piece") || localState.draggedPieceId;
+
+            if (!pieceId) {
+                return;
+            }
+
+            dragEvent.preventDefault();
+            const x = Number(cell.dataset.cellX);
+            const y = Number(cell.dataset.cellY);
+
+            if (!localState.previewPosition || localState.previewPosition.x !== x || localState.previewPosition.y !== y || localState.draggedPieceId !== pieceId) {
+                setPlacementPreview(pieceId, x, y);
+                updateOwnBoardPreview(ownState);
+            }
+        });
+
+        ownBoard?.addEventListener("dragleave", (event) => {
+            const relatedTarget = /** @type {DragEvent} */ (event).relatedTarget;
+
+            if (relatedTarget instanceof Node && ownBoard.contains(relatedTarget)) {
+                return;
+            }
+
+            if (localState.previewPosition) {
+                clearPlacementPreview();
+                updateOwnBoardPreview(ownState);
+            }
+        });
+
+        ownBoard?.addEventListener("drop", async (event) => {
+            const dragEvent = /** @type {DragEvent} */ (event);
+            const target = dragEvent.target;
+
+            if (!(target instanceof HTMLElement)) {
+                return;
+            }
+
+            const cell = target.closest("[data-cell-x][data-cell-y]");
+
+            if (!(cell instanceof HTMLElement)) {
+                return;
+            }
+
+            const pieceId = dragEvent.dataTransfer?.getData("application/x-tetris-piece") || localState.draggedPieceId;
+
+            if (!pieceId) {
+                return;
+            }
+
+            dragEvent.preventDefault();
+
+            const position = {
+                x: Number(cell.dataset.cellX),
+                y: Number(cell.dataset.cellY)
             };
 
-            renderGame(game, moves);
-        });
+            const previewCells = getPreviewCells(ownState.board, pieceId, 0, position);
 
-        root.querySelectorAll("[data-control]").forEach((button) => {
-            button.addEventListener("click", () => {
-                const control = button.getAttribute("data-control");
+            if (previewCells.length === 0) {
+                setStatus("Posizione non valida per il pezzo selezionato.", "error");
+                clearPlacementPreview();
+                updateOwnBoardPreview(ownState);
+                return;
+            }
 
-                if (control === "left") {
-                    moveSelection(-1, 0);
-                } else if (control === "right") {
-                    moveSelection(1, 0);
-                } else if (control === "up") {
-                    moveSelection(0, -1);
-                } else if (control === "down") {
-                    moveSelection(0, 1);
-                } else if (control === "rotate-left") {
-                    rotateSelection(-1);
-                } else if (control === "rotate-right") {
-                    rotateSelection(1);
-                }
-            });
-        });
-
-        placeButton?.addEventListener("click", async () => {
-            await submitCurrentMove(selfPlayer.id);
+            await submitCurrentMove(selfPlayer.id, pieceId, position);
         });
 
         changeLocalPlayerButton?.addEventListener("click", () => {
             clearLocalPlayerId();
+            clearPlacementPreview();
             if (currentGame) {
                 renderGame(currentGame, currentMoves);
             }
@@ -702,6 +771,8 @@ export function renderMatchView(root, profile, gameId, options) {
                 setStatus("Rimozione player in corso...", "idle");
                 await player.removePlayerFromGame(game.id, selfPlayer.id);
                 clearLocalPlayerId();
+                clearPlacementPreview();
+                broadcastMatchUpdate("player-removed");
                 await refreshGameState();
             } catch (error) {
                 const message = error instanceof Error ? error.message : "Errore sconosciuto";
@@ -711,57 +782,11 @@ export function renderMatchView(root, profile, gameId, options) {
     }
 
     /**
-     * @param {number} deltaX
-     * @param {number} deltaY
-     */
-    function moveSelection(deltaX, deltaY) {
-        const selfPlayerId = getLocalPlayerId();
-
-        if (!currentGame || !selfPlayerId) {
-            return;
-        }
-
-        const gameState = getLatestGameState(currentGame.players, currentMoves);
-        const ownState = gameState.players[selfPlayerId];
-
-        if (!ownState) {
-            return;
-        }
-
-        localState.position = clampPosition(ownState.board, localState.selectedPieceId, localState.rotation, {
-            x: localState.position.x + deltaX,
-            y: localState.position.y + deltaY
-        });
-
-        renderGame(currentGame, currentMoves);
-    }
-
-    /**
-     * @param {number} delta
-     */
-    function rotateSelection(delta) {
-        const selfPlayerId = getLocalPlayerId();
-
-        if (!currentGame || !selfPlayerId) {
-            return;
-        }
-
-        const gameState = getLatestGameState(currentGame.players, currentMoves);
-        const ownState = gameState.players[selfPlayerId];
-
-        if (!ownState) {
-            return;
-        }
-
-        localState.rotation = ((localState.rotation + delta) % 4 + 4) % 4;
-        localState.position = clampPosition(ownState.board, localState.selectedPieceId, localState.rotation, localState.position);
-        renderGame(currentGame, currentMoves);
-    }
-
-    /**
      * @param {string} localPlayerId
+     * @param {string} pieceId
+     * @param {{x: number, y: number}} position
      */
-    async function submitCurrentMove(localPlayerId) {
+    async function submitCurrentMove(localPlayerId, pieceId, position) {
         if (!currentGame || isSubmitting) {
             return;
         }
@@ -781,10 +806,23 @@ export function renderMatchView(root, profile, gameId, options) {
             const { nextState, summary } = applyMove(
                 gameState,
                 localPlayerId,
-                localState.selectedPieceId,
-                localState.rotation,
-                localState.position
+                pieceId,
+                0,
+                position
             );
+
+            const selfPlayer = currentGame.players.find((entry) => entry.id === localPlayerId) || null;
+            const opponentPlayer = selfPlayer
+                ? currentGame.players.find((entry) => entry.id !== selfPlayer.id) || null
+                : null;
+            const nextOwnState = nextState.players[localPlayerId] || null;
+            const nextOpponentState = opponentPlayer ? nextState.players[opponentPlayer.id] || null : null;
+
+            clearPlacementPreview();
+
+            if (selfPlayer && nextOwnState) {
+                renderBoardLayout(currentGame, nextOwnState, selfPlayer, opponentPlayer, nextOpponentState);
+            }
 
             await player.addMoveToGame(currentGame.id, localPlayerId, {
                 type: "tetris-turn",
@@ -792,9 +830,16 @@ export function renderMatchView(root, profile, gameId, options) {
                 summary
             });
 
+            broadcastMatchUpdate("move-placed");
             setStatus("Mossa registrata.", "success");
             await refreshGameState();
         } catch (error) {
+            clearPlacementPreview();
+
+            if (currentGame) {
+                renderGame(currentGame, currentMoves);
+            }
+
             const message = error instanceof Error ? error.message : "Errore sconosciuto";
             setStatus(message, "error");
         } finally {
@@ -806,8 +851,6 @@ export function renderMatchView(root, profile, gameId, options) {
         if (disposed) {
             return;
         }
-
-        setRefreshLoading(true);
 
         try {
             let [game, moves] = await Promise.all([
@@ -843,54 +886,33 @@ export function renderMatchView(root, profile, gameId, options) {
                 </div>
             `;
             setStatus(message, "error");
-        } finally {
-            setRefreshLoading(false);
         }
     }
 
     /**
-     * @param {KeyboardEvent} event
+     * @param {MessageEvent} event
      */
-    function onKeyDown(event) {
-        if (disposed || !currentGame || !getLocalPlayerId()) {
+    function onSyncMessage(event) {
+        if (disposed) {
             return;
         }
 
-        if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
+        if (event.data?.gameId !== gameId) {
             return;
         }
 
-        if (event.key === "ArrowLeft") {
-            event.preventDefault();
-            moveSelection(-1, 0);
-        } else if (event.key === "ArrowRight") {
-            event.preventDefault();
-            moveSelection(1, 0);
-        } else if (event.key === "ArrowUp") {
-            event.preventDefault();
-            moveSelection(0, -1);
-        } else if (event.key === "ArrowDown") {
-            event.preventDefault();
-            moveSelection(0, 1);
-        } else if (event.key.toLowerCase() === "q") {
-            event.preventDefault();
-            rotateSelection(-1);
-        } else if (event.key.toLowerCase() === "e" || event.key.toLowerCase() === "r") {
-            event.preventDefault();
-            rotateSelection(1);
-        } else if (event.key === "1" || event.key === "2" || event.key === "3") {
-            const piece = getPieceCatalog()[Number(event.key) - 1];
+        refreshGameState();
+    }
 
-            if (piece) {
-                event.preventDefault();
-                localState.selectedPieceId = piece.id;
-                localState.rotation = 0;
-                renderGame(currentGame, currentMoves);
-            }
-        } else if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            submitCurrentMove(getLocalPlayerId() || "");
+    /**
+     * @param {StorageEvent} event
+     */
+    function onStorage(event) {
+        if (disposed || event.key !== getMatchSyncChannelName() || !event.newValue) {
+            return;
         }
+
+        refreshGameState();
     }
 
     backButton.addEventListener("click", () => {
@@ -901,16 +923,22 @@ export function renderMatchView(root, profile, gameId, options) {
         options.onLogout();
     });
 
-    refreshButton.addEventListener("click", () => {
-        refreshGameState();
-    });
+    if (typeof BroadcastChannel !== "undefined") {
+        syncChannel = new BroadcastChannel(getMatchSyncChannelName());
+        syncChannel.addEventListener("message", onSyncMessage);
+    }
 
-    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("storage", onStorage);
     refreshGameState();
 
     return () => {
         disposed = true;
-        window.removeEventListener("keydown", onKeyDown);
+        window.removeEventListener("storage", onStorage);
+
+        if (syncChannel) {
+            syncChannel.removeEventListener("message", onSyncMessage);
+            syncChannel.close();
+        }
     };
 }
 

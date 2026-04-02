@@ -56,6 +56,7 @@ const PIECES = {
  *     userId: string,
  *     name: string,
  *     board: number[][],
+ *     upcomingPieces: Array<string>,
  *     linesCleared: number,
  *     garbageReceived: number
  * }} PlayerBoardState
@@ -80,6 +81,15 @@ export function getPieceCatalog() {
 }
 
 /**
+ * @param {string} pieceId
+ * @param {number} [rotation]
+ * @returns {Array<[number, number]>}
+ */
+export function getPieceCellsForRender(pieceId, rotation = 0) {
+    return getPieceCells(pieceId, rotation);
+}
+
+/**
  * @param {Array<GamePlayer>} players
  * @returns {TetrisGameState}
  */
@@ -92,6 +102,7 @@ export function createInitialGameState(players) {
             userId,
             name: player.name,
             board: createEmptyBoard(BOARD_SIZE),
+            upcomingPieces: createUpcomingPieces(),
             linesCleared: 0,
             garbageReceived: 0
         };
@@ -130,13 +141,20 @@ export function getLatestGameState(players, moves) {
  * @param {{x: number, y: number}} position
  */
 export function applyMove(state, userId, pieceId, rotation, position) {
-    const pieceCells = getPieceCells(pieceId, rotation);
     const nextState = cloneGameState(state);
     const actorState = nextState.players[userId];
 
     if (!actorState) {
         throw new Error("Player not found in game state");
     }
+
+    const upcomingPieceIndex = actorState.upcomingPieces.findIndex((candidate) => candidate === pieceId);
+
+    if (upcomingPieceIndex === -1) {
+        throw new Error("La pedina selezionata non e disponibile");
+    }
+
+    const pieceCells = getPieceCells(pieceId, rotation);
 
     if (!canPlacePiece(actorState.board, pieceCells, position)) {
         throw new Error("Posizione non valida per la pedina selezionata");
@@ -183,6 +201,8 @@ export function applyMove(state, userId, pieceId, rotation, position) {
     }
 
     actorState.linesCleared += clearedRows.length + clearedColumns.length;
+    actorState.upcomingPieces.splice(upcomingPieceIndex, 1);
+    refillUpcomingPieces(actorState.upcomingPieces);
 
     const garbageTargets = [];
     const garbageCount = clearedRows.length + clearedColumns.length;
@@ -422,11 +442,13 @@ function normalizeGameState(state, players) {
                 userId,
                 name: player.name,
                 board: createEmptyBoard(nextState.boardSize),
+                upcomingPieces: createUpcomingPieces(),
                 linesCleared: 0,
                 garbageReceived: 0
             };
         } else {
             nextState.players[userId].name = player.name;
+            nextState.players[userId].upcomingPieces = normalizeUpcomingPieces(nextState.players[userId].upcomingPieces);
         }
     }
 
@@ -462,6 +484,7 @@ function cloneGameState(state) {
                     userId: player.userId,
                     name: player.name,
                     board: player.board.map((row) => [...row]),
+                    upcomingPieces: normalizeUpcomingPieces(player.upcomingPieces),
                     linesCleared: player.linesCleared,
                     garbageReceived: player.garbageReceived
                 }
@@ -476,6 +499,45 @@ function cloneGameState(state) {
  */
 function createEmptyBoard(size) {
     return Array.from({ length: size }, () => Array.from({ length: size }, () => 0));
+}
+
+/**
+ * @returns {Array<string>}
+ */
+function createUpcomingPieces() {
+    const upcomingPieces = [];
+    refillUpcomingPieces(upcomingPieces);
+    return upcomingPieces;
+}
+
+/**
+ * @param {unknown} upcomingPieces
+ * @returns {Array<string>}
+ */
+function normalizeUpcomingPieces(upcomingPieces) {
+    const normalized = Array.isArray(upcomingPieces)
+        ? upcomingPieces.filter((pieceId) => typeof pieceId === "string" && pieceId in PIECES).slice(0, 3)
+        : [];
+
+    refillUpcomingPieces(normalized);
+    return normalized;
+}
+
+/**
+ * @param {Array<string>} upcomingPieces
+ */
+function refillUpcomingPieces(upcomingPieces) {
+    while (upcomingPieces.length < 3) {
+        upcomingPieces.push(getRandomPieceId());
+    }
+}
+
+/**
+ * @returns {string}
+ */
+function getRandomPieceId() {
+    const pieceIds = Object.keys(PIECES);
+    return pieceIds[Math.floor(Math.random() * pieceIds.length)];
 }
 
 /**
