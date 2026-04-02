@@ -245,6 +245,21 @@ export function renderMatchView(root, profile, gameId, options) {
     }
 
     /**
+     * @param {{ currentTurnUserId?: string | null, players: Record<string, PlayerBoardState> }} gameState
+     * @param {string} playerId
+     * @returns {boolean}
+     */
+    function isPlayerTurn(gameState, playerId) {
+        const playerIds = Object.keys(gameState.players);
+
+        if (playerIds.length <= 1) {
+            return true;
+        }
+
+        return gameState.currentTurnUserId === playerId;
+    }
+
+    /**
      * @param {GameDetails} game
      * @returns {Promise<boolean>}
      */
@@ -296,7 +311,7 @@ export function renderMatchView(root, profile, gameId, options) {
      * @param {Array<string>} upcomingPieces
      * @returns {string}
      */
-    function renderPieceQueueHtml(upcomingPieces) {
+    function renderPieceQueueHtml(upcomingPieces, canDragPieces) {
         if (upcomingPieces.length === 0) {
             return `
                 <div class="empty-state">
@@ -314,7 +329,8 @@ export function renderMatchView(root, profile, gameId, options) {
                         data-piece-id="${escapeHtml(pieceId)}"
                         aria-label="Pezzo ${escapeHtml(pieceId)}"
                         title="${escapeHtml(pieceId)}"
-                        draggable="true"
+                        draggable="${canDragPieces ? "true" : "false"}"
+                        ${canDragPieces ? "" : "disabled"}
                     >
                         ${renderPieceMiniBoard(pieceId)}
                     </button>
@@ -360,20 +376,31 @@ export function renderMatchView(root, profile, gameId, options) {
 
     /**
      * @param {GameDetails} game
+     * @param {{ currentTurnUserId?: string | null, version: number, players: Record<string, PlayerBoardState> }} gameState
      * @param {PlayerBoardState} ownState
      * @param {{id: string, name: string}} selfPlayer
      * @param {{id: string, name: string} | null} opponentPlayer
      * @param {PlayerBoardState | null} opponentState
      */
-    function renderBoardLayout(game, ownState, selfPlayer, opponentPlayer, opponentState) {
+    function renderBoardLayout(game, gameState, ownState, selfPlayer, opponentPlayer, opponentState) {
         const previewCells = getCurrentPreviewCells(ownState);
         const canMoveAtAll = hasPlayablePiece(ownState.board, ownState.upcomingPieces);
+        const isLocalTurn = isPlayerTurn(gameState, selfPlayer.id);
+        const turnLabel = gameState.currentTurnUserId
+            ? game.players.find((entry) => entry.id === gameState.currentTurnUserId)?.name || "Player sconosciuto"
+            : "In attesa";
+        const turnNumber = gameState.version + 1;
 
         matchContent.innerHTML = `
             <div class="match-player-banner">
                 <div class="match-player-badge">
                     <span class="panel-kicker">Stai giocando come</span>
                     <strong>${escapeHtml(selfPlayer.name)}</strong>
+                </div>
+                <div class="match-player-badge">
+                    <span class="panel-kicker">Turno corrente</span>
+                    <strong>${escapeHtml(turnLabel)}</strong>
+                    <span>Turno ${String(turnNumber)}</span>
                 </div>
                 <div class="match-player-actions">
                     <button id="change-local-player-button" class="secondary-button" type="button">Cambia player locale</button>
@@ -396,8 +423,8 @@ export function renderMatchView(root, profile, gameId, options) {
 
                     <div class="match-sidebar-card">
                         <p class="panel-kicker">Pezzi disponibili</p>
-                        <p class="muted-copy">Trascina uno dei tre pezzi sulla griglia. I blocchi gia piazzati restano fissi.</p>
-                        ${renderPieceQueueHtml(ownState.upcomingPieces)}
+                        <p class="muted-copy">Trascina un pezzo sulla griglia quando e il tuo turno. Se completi una riga o colonna, l'avversario riceve nuovi pezzi in coda.</p>
+                        ${renderPieceQueueHtml(ownState.upcomingPieces, isLocalTurn && canMoveAtAll)}
                     </div>
 
                     <div id="own-board" class="board" aria-label="Griglia personale">
@@ -405,9 +432,11 @@ export function renderMatchView(root, profile, gameId, options) {
                     </div>
 
                     <p class="status ${canMoveAtAll ? "" : "status-inline-error"}" data-state="${canMoveAtAll ? "idle" : "error"}">
-                        ${canMoveAtAll
-                            ? "Posiziona un pezzo trascinandolo sulla tua griglia."
-                            : "Nessuno dei tre pezzi disponibili entra nella griglia attuale."}
+                        ${!isLocalTurn
+                            ? "Attendi il turno dell'altro player."
+                            : canMoveAtAll
+                                ? "Posiziona un pezzo trascinandolo sulla tua griglia."
+                                : "Nessun pezzo disponibile entra nella griglia attuale."}
                     </p>
                 </section>
 
@@ -431,12 +460,12 @@ export function renderMatchView(root, profile, gameId, options) {
                         <p class="panel-kicker">${opponentPlayer ? "Effetti" : "Stato lobby"}</p>
                         <p class="muted-copy">
                             ${opponentPlayer
-                                ? "Quando l'avversario completa righe o colonne, nella tua griglia arriva un blocco casuale di disturbo per ogni linea completata."
+                                ? "Quando l'avversario completa righe o colonne, ricevi un pezzo casuale in coda per ogni linea completata."
                                 : "Apri un secondo browser o tab, usa la stessa API key e scegli il nome dell'avversario in questa stessa lobby."}
                         </p>
                         <p class="muted-copy">
                             ${opponentPlayer
-                                ? `Disturbi ricevuti: <strong>${String(ownState.garbageReceived)}</strong>`
+                                ? `Pezzi ricevuti dall'avversario: <strong>${String(ownState.garbageReceived)}</strong>`
                                 : "Quando l'altro player entra o piazza un blocco, questa schermata si sincronizza automaticamente."}
                         </p>
                     </div>
@@ -474,7 +503,7 @@ export function renderMatchView(root, profile, gameId, options) {
             return;
         }
 
-        renderBoardLayout(game, ownState, selfPlayer, opponentPlayer, opponentState);
+        renderBoardLayout(game, gameState, ownState, selfPlayer, opponentPlayer, opponentState);
     }
 
     /**
@@ -636,7 +665,22 @@ export function renderMatchView(root, profile, gameId, options) {
         const changeLocalPlayerButton = root.querySelector("#change-local-player-button");
         const removeLocalPlayerButton = root.querySelector("#remove-local-player-button");
 
+        function canInteractThisTurn() {
+            if (!currentGame) {
+                return false;
+            }
+
+            const gameState = getLatestGameState(currentGame.players, currentMoves);
+            return isPlayerTurn(gameState, selfPlayer.id);
+        }
+
         piecesPicker?.addEventListener("dragstart", (event) => {
+            if (!canInteractThisTurn()) {
+                event.preventDefault();
+                setStatus("Non e il tuo turno.", "error");
+                return;
+            }
+
             const target = event.target;
 
             if (!(target instanceof HTMLElement)) {
@@ -661,8 +705,10 @@ export function renderMatchView(root, profile, gameId, options) {
             dragEvent.dataTransfer?.setData("application/x-tetris-piece", pieceId);
 
             if (pieceMiniBoard instanceof HTMLElement) {
-                const { width, height } = pieceMiniBoard.getBoundingClientRect();
-                dragEvent.dataTransfer?.setDragImage(pieceMiniBoard, width / 2, height / 2);
+                const { left, top, width, height } = pieceMiniBoard.getBoundingClientRect();
+                const offsetX = clampDragOffset(dragEvent.clientX - left, width);
+                const offsetY = clampDragOffset(dragEvent.clientY - top, height);
+                dragEvent.dataTransfer?.setDragImage(pieceMiniBoard, offsetX, offsetY);
             } else {
                 dragEvent.dataTransfer?.setDragImage(pieceButton, 24, 24);
             }
@@ -677,6 +723,10 @@ export function renderMatchView(root, profile, gameId, options) {
         });
 
         ownBoard?.addEventListener("dragover", (event) => {
+            if (!canInteractThisTurn()) {
+                return;
+            }
+
             const dragEvent = /** @type {DragEvent} */ (event);
             const target = dragEvent.target;
 
@@ -720,6 +770,12 @@ export function renderMatchView(root, profile, gameId, options) {
         });
 
         ownBoard?.addEventListener("drop", async (event) => {
+            if (!canInteractThisTurn()) {
+                event.preventDefault();
+                setStatus("Non e il tuo turno.", "error");
+                return;
+            }
+
             const dragEvent = /** @type {DragEvent} */ (event);
             const target = dragEvent.target;
 
@@ -821,7 +877,7 @@ export function renderMatchView(root, profile, gameId, options) {
             clearPlacementPreview();
 
             if (selfPlayer && nextOwnState) {
-                renderBoardLayout(currentGame, nextOwnState, selfPlayer, opponentPlayer, nextOpponentState);
+                renderBoardLayout(currentGame, nextState, nextOwnState, selfPlayer, opponentPlayer, nextOpponentState);
             }
 
             await player.addMoveToGame(currentGame.id, localPlayerId, {
@@ -977,6 +1033,19 @@ function renderBoardHtml(board, previewCells, interactive) {
             }).join("")).join("")}
         </div>
     `;
+}
+
+/**
+ * @param {number} value
+ * @param {number} max
+ * @returns {number}
+ */
+function clampDragOffset(value, max) {
+    if (!Number.isFinite(value) || !Number.isFinite(max) || max <= 0) {
+        return 0;
+    }
+
+    return Math.max(0, Math.min(value, max));
 }
 
 /**

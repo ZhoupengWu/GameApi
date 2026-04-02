@@ -114,7 +114,9 @@ Il flusso previsto dal frontend e questo:
 ## Tetris implementato
 
 - Due griglie `8x8`, una per player.
-- Tre pedine selezionabili: `I`, `O`, `T`.
-- Movimento via tastiera o pulsanti.
-- Se completi una o piu righe o colonne, l'altro player riceve blocchi casuali di disturbo.
-- La sincronizzazione tra i due browser avviene tramite polling delle mosse salvate nelle API.
+- Coda pezzi composta da `I`, `O`, `T`, servita dal backend statico su `/frontend`.
+- Interazione via drag and drop dal pannello pezzi alla propria griglia.
+- Turni alternati tra i due player, con indicatore del turno corrente in partita.
+- Se completi una o piu righe o colonne, l'altro player riceve un pezzo casuale aggiuntivo in coda per ogni linea completata.
+- I blocchi gia piazzati restano fissi sulla griglia finche non vengono rimossi dal completamento di una riga o colonna.
+- La sincronizzazione tra i browser usa le mosse salvate via API e aggiornamenti locali via `BroadcastChannel` o evento `storage`.

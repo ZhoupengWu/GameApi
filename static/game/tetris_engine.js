@@ -66,6 +66,7 @@ const PIECES = {
  * @typedef {{
  *     version: number,
  *     boardSize: number,
+ *     currentTurnUserId: string | null,
  *     players: Record<string, PlayerBoardState>
  * }} TetrisGameState
  */
@@ -111,6 +112,7 @@ export function createInitialGameState(players) {
     return {
         version: 0,
         boardSize: BOARD_SIZE,
+        currentTurnUserId: players.length > 0 ? getPlayerUserId(players[0]) : null,
         players: statePlayers
     };
 }
@@ -146,6 +148,16 @@ export function applyMove(state, userId, pieceId, rotation, position) {
 
     if (!actorState) {
         throw new Error("Player not found in game state");
+    }
+
+    const activePlayerIds = getActivePlayerIds(nextState.players);
+
+    if (
+        activePlayerIds.length > 1 &&
+        nextState.currentTurnUserId &&
+        nextState.currentTurnUserId !== userId
+    ) {
+        throw new Error("Non e il turno di questo player");
     }
 
     const upcomingPieceIndex = actorState.upcomingPieces.findIndex((candidate) => candidate === pieceId);
@@ -204,24 +216,25 @@ export function applyMove(state, userId, pieceId, rotation, position) {
     actorState.upcomingPieces.splice(upcomingPieceIndex, 1);
     refillUpcomingPieces(actorState.upcomingPieces);
 
-    const garbageTargets = [];
-    const garbageCount = clearedRows.length + clearedColumns.length;
+    const awardedPieces = [];
+    const awardedPieceCount = clearedRows.length + clearedColumns.length;
 
-    if (garbageCount > 0) {
+    if (awardedPieceCount > 0) {
         for (const [targetUserId, targetState] of Object.entries(nextState.players)) {
             if (targetUserId === userId) {
                 continue;
             }
 
-            const cells = addRandomGarbage(targetState.board, garbageCount);
-            targetState.garbageReceived += cells.length;
-            garbageTargets.push({
+            const pieces = addAwardedPieces(targetState.upcomingPieces, awardedPieceCount);
+            targetState.garbageReceived += pieces.length;
+            awardedPieces.push({
                 targetUserId,
-                cells
+                pieces
             });
         }
     }
 
+    nextState.currentTurnUserId = getNextTurnUserId(activePlayerIds, userId);
     nextState.version += 1;
 
     return {
@@ -232,7 +245,8 @@ export function applyMove(state, userId, pieceId, rotation, position) {
             position,
             clearedRows,
             clearedColumns,
-            garbageTargets
+            awardedPieces,
+            currentTurnUserId: nextState.currentTurnUserId
         }
     };
 }
@@ -388,42 +402,67 @@ function getPieceBounds(cells) {
 }
 
 /**
- * @param {number[][]} board
+ * @param {Array<string>} upcomingPieces
  * @param {number} count
- * @returns {Array<{x: number, y: number}>}
+ * @returns {Array<string>}
  */
-function addRandomGarbage(board, count) {
-    const emptyCells = [];
+function addAwardedPieces(upcomingPieces, count) {
+    const pieces = [];
 
-    for (let y = 0; y < board.length; y += 1) {
-        for (let x = 0; x < board[y].length; x += 1) {
-            if (board[y][x] === 0) {
-                emptyCells.push({ x, y });
-            }
-        }
+    for (let index = 0; index < count; index += 1) {
+        pieces.push(getRandomPieceId());
     }
 
-    shuffle(emptyCells);
-
-    const selected = emptyCells.slice(0, count);
-
-    for (const cell of selected) {
-        board[cell.y][cell.x] = 2;
-    }
-
-    return selected;
+    upcomingPieces.push(...pieces);
+    return pieces;
 }
 
 /**
- * @param {Array<{x: number, y: number}>} cells
+ * @param {Record<string, PlayerBoardState>} players
+ * @returns {Array<string>}
  */
-function shuffle(cells) {
-    for (let index = cells.length - 1; index > 0; index -= 1) {
-        const swapIndex = Math.floor(Math.random() * (index + 1));
-        const current = cells[index];
-        cells[index] = cells[swapIndex];
-        cells[swapIndex] = current;
+function getActivePlayerIds(players) {
+    return Object.keys(players);
+}
+
+/**
+ * @param {string | null | undefined} currentTurnUserId
+ * @param {Array<string>} activePlayerIds
+ * @returns {string | null}
+ */
+function normalizeCurrentTurnUserId(currentTurnUserId, activePlayerIds) {
+    if (activePlayerIds.length === 0) {
+        return null;
     }
+
+    if (currentTurnUserId && activePlayerIds.includes(currentTurnUserId)) {
+        return currentTurnUserId;
+    }
+
+    return activePlayerIds[0];
+}
+
+/**
+ * @param {Array<string>} activePlayerIds
+ * @param {string} currentUserId
+ * @returns {string | null}
+ */
+function getNextTurnUserId(activePlayerIds, currentUserId) {
+    if (activePlayerIds.length === 0) {
+        return null;
+    }
+
+    if (activePlayerIds.length === 1) {
+        return activePlayerIds[0];
+    }
+
+    const currentIndex = activePlayerIds.indexOf(currentUserId);
+
+    if (currentIndex === -1) {
+        return activePlayerIds[0];
+    }
+
+    return activePlayerIds[(currentIndex + 1) % activePlayerIds.length];
 }
 
 /**
@@ -452,6 +491,9 @@ function normalizeGameState(state, players) {
         }
     }
 
+    const activePlayerIds = players.map((player) => getPlayerUserId(player));
+    nextState.currentTurnUserId = normalizeCurrentTurnUserId(nextState.currentTurnUserId, activePlayerIds);
+
     return nextState;
 }
 
@@ -477,6 +519,9 @@ function cloneGameState(state) {
     return {
         version: state.version,
         boardSize: state.boardSize,
+        currentTurnUserId: typeof state.currentTurnUserId === "string" || state.currentTurnUserId === null
+            ? state.currentTurnUserId
+            : null,
         players: Object.fromEntries(
             Object.entries(state.players).map(([userId, player]) => [
                 userId,
@@ -516,7 +561,7 @@ function createUpcomingPieces() {
  */
 function normalizeUpcomingPieces(upcomingPieces) {
     const normalized = Array.isArray(upcomingPieces)
-        ? upcomingPieces.filter((pieceId) => typeof pieceId === "string" && pieceId in PIECES).slice(0, 3)
+        ? upcomingPieces.filter((pieceId) => typeof pieceId === "string" && pieceId in PIECES)
         : [];
 
     refillUpcomingPieces(normalized);

@@ -449,6 +449,11 @@ button:disabled {
     cursor: grabbing;
 }
 
+.piece-card:disabled {
+    opacity: 0.58;
+    cursor: not-allowed;
+}
+
 .piece-mini-board {
     display: grid;
     grid-template-columns: repeat(4, 14px);
