@@ -524,8 +524,7 @@ export function renderMatchView(root, profile, gameId, options) {
                             ${escapeHtml(matchCompletion ? `Stato lobby: ${matchCompletion.status}` : game.status)}
                         </p>
                         <div class="match-actions">
-                            <button id="leave-match-button" type="button">Esci dalla partita</button>
-                            <button id="back-to-lobby-button" class="secondary-button" type="button">Torna alla lobby</button>
+                            <button id="leave-match-button" type="button">Esci dalla partita e torna alla lobby</button>
                         </div>
                     </div>
                 </div>
@@ -614,9 +613,6 @@ export function renderMatchView(root, profile, gameId, options) {
             }
         });
 
-        root.querySelector("#back-to-lobby-button")?.addEventListener("click", () => {
-            options.onBack();
-        });
     }
 
     /**
