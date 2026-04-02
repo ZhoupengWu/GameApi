@@ -1,6 +1,7 @@
 import { Player } from "../client_auth.js";
 import {
     applyMove,
+    clampPosition,
     findFirstValidPosition,
     getLatestGameState,
     getPieceCatalog,
@@ -97,7 +98,9 @@ export function renderMatchView(root, profile, gameId, options) {
 
     const localState = {
         draggedPieceId: null,
-        previewPosition: null
+        previewPosition: null,
+        dragAnchorCell: { x: 0, y: 0 },
+        dropCommitted: false
     };
 
     /** @type {GameDetails | null} */
@@ -220,6 +223,7 @@ export function renderMatchView(root, profile, gameId, options) {
     function clearPlacementPreview() {
         localState.draggedPieceId = null;
         localState.previewPosition = null;
+        localState.dragAnchorCell = { x: 0, y: 0 };
     }
 
     /**
@@ -859,8 +863,10 @@ export function renderMatchView(root, profile, gameId, options) {
                 const { left, top, width, height } = pieceMiniBoard.getBoundingClientRect();
                 const offsetX = clampDragOffset(dragEvent.clientX - left, width);
                 const offsetY = clampDragOffset(dragEvent.clientY - top, height);
+                localState.dragAnchorCell = getDragAnchorCell(pieceId, pieceMiniBoard, offsetX, offsetY);
                 dragEvent.dataTransfer?.setDragImage(pieceMiniBoard, offsetX, offsetY);
             } else {
+                localState.dragAnchorCell = { x: 0, y: 0 };
                 dragEvent.dataTransfer?.setDragImage(pieceButton, 24, 24);
             }
 
@@ -869,6 +875,12 @@ export function renderMatchView(root, profile, gameId, options) {
         });
 
         piecesPicker?.addEventListener("dragend", () => {
+            if (localState.dropCommitted) {
+                localState.dropCommitted = false;
+                clearPlacementPreview();
+                return;
+            }
+
             clearPlacementPreview();
             updateOwnBoardPreview(ownState);
         });
@@ -898,8 +910,12 @@ export function renderMatchView(root, profile, gameId, options) {
             }
 
             dragEvent.preventDefault();
-            const x = Number(cell.dataset.cellX);
-            const y = Number(cell.dataset.cellY);
+            const position = clampPosition(ownState.board, pieceId, 0, {
+                x: Number(cell.dataset.cellX) - localState.dragAnchorCell.x,
+                y: Number(cell.dataset.cellY) - localState.dragAnchorCell.y
+            });
+            const x = position.x;
+            const y = position.y;
 
             if (!localState.previewPosition || localState.previewPosition.x !== x || localState.previewPosition.y !== y || localState.draggedPieceId !== pieceId) {
                 setPlacementPreview(pieceId, x, y);
@@ -949,11 +965,12 @@ export function renderMatchView(root, profile, gameId, options) {
             dragEvent.preventDefault();
 
             const position = {
-                x: Number(cell.dataset.cellX),
-                y: Number(cell.dataset.cellY)
+                x: Number(cell.dataset.cellX) - localState.dragAnchorCell.x,
+                y: Number(cell.dataset.cellY) - localState.dragAnchorCell.y
             };
+            const clampedPosition = clampPosition(ownState.board, pieceId, 0, position);
 
-            const previewCells = getPreviewCells(ownState.board, pieceId, 0, position);
+            const previewCells = getPreviewCells(ownState.board, pieceId, 0, clampedPosition);
 
             if (previewCells.length === 0) {
                 setStatus("Posizione non valida per il pezzo selezionato.", "error");
@@ -962,7 +979,8 @@ export function renderMatchView(root, profile, gameId, options) {
                 return;
             }
 
-            await submitCurrentMove(selfPlayer.id, pieceId, position);
+            localState.dropCommitted = true;
+            await submitCurrentMove(selfPlayer.id, pieceId, clampedPosition);
         });
 
         changeLocalPlayerButton?.addEventListener("click", () => {
@@ -1197,6 +1215,44 @@ function clampDragOffset(value, max) {
     }
 
     return Math.max(0, Math.min(value, max));
+}
+
+/**
+ * @param {string} pieceId
+ * @param {HTMLElement} pieceMiniBoard
+ * @param {number} offsetX
+ * @param {number} offsetY
+ * @returns {{x: number, y: number}}
+ */
+function getDragAnchorCell(pieceId, pieceMiniBoard, offsetX, offsetY) {
+    const occupiedCells = getPieceCellsForRender(pieceId, 0).map(([x, y]) => ({ x, y }));
+    const columnCount = 4;
+    const rowCount = 4;
+    const cellWidth = pieceMiniBoard.clientWidth / columnCount;
+    const cellHeight = pieceMiniBoard.clientHeight / rowCount;
+
+    if (!Number.isFinite(cellWidth) || !Number.isFinite(cellHeight) || cellWidth <= 0 || cellHeight <= 0) {
+        return occupiedCells[0] || { x: 0, y: 0 };
+    }
+
+    const pointerCell = {
+        x: Math.max(0, Math.min(columnCount - 1, Math.floor(offsetX / cellWidth))),
+        y: Math.max(0, Math.min(rowCount - 1, Math.floor(offsetY / cellHeight)))
+    };
+
+    let selectedCell = occupiedCells[0] || { x: 0, y: 0 };
+    let selectedDistance = Number.POSITIVE_INFINITY;
+
+    for (const cell of occupiedCells) {
+        const distance = Math.abs(cell.x - pointerCell.x) + Math.abs(cell.y - pointerCell.y);
+
+        if (distance < selectedDistance) {
+            selectedCell = cell;
+            selectedDistance = distance;
+        }
+    }
+
+    return selectedCell;
 }
 
 /**
