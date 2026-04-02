@@ -216,41 +216,7 @@ export function applyMove(state, userId, pieceId, rotation, position) {
         actorState.board[position.y + cellY][position.x + cellX] = 1;
     }
 
-    const clearedRows = [];
-    const clearedColumns = [];
-
-    for (let row = 0; row < nextState.boardSize; row += 1) {
-        if (actorState.board[row].every((cell) => cell > 0)) {
-            clearedRows.push(row);
-        }
-    }
-
-    for (let column = 0; column < nextState.boardSize; column += 1) {
-        let isFilled = true;
-
-        for (let row = 0; row < nextState.boardSize; row += 1) {
-            if (actorState.board[row][column] === 0) {
-                isFilled = false;
-                break;
-            }
-        }
-
-        if (isFilled) {
-            clearedColumns.push(column);
-        }
-    }
-
-    for (const row of clearedRows) {
-        for (let column = 0; column < nextState.boardSize; column += 1) {
-            actorState.board[row][column] = 0;
-        }
-    }
-
-    for (const column of clearedColumns) {
-        for (let row = 0; row < nextState.boardSize; row += 1) {
-            actorState.board[row][column] = 0;
-        }
-    }
+    const { clearedRows, clearedColumns } = resolveCompletedLines(actorState.board);
 
     actorState.linesCleared += clearedRows.length + clearedColumns.length;
     actorState.upcomingPieces.splice(upcomingPieceIndex, 1);
@@ -266,6 +232,8 @@ export function applyMove(state, userId, pieceId, rotation, position) {
             }
 
             const placements = [];
+            const garbageClearedRows = [];
+            const garbageClearedColumns = [];
 
             for (let index = 0; index < garbageCount; index += 1) {
                 const placedPiece = addRandomGarbagePiece(targetState.board);
@@ -275,12 +243,17 @@ export function applyMove(state, userId, pieceId, rotation, position) {
                 }
 
                 placements.push(placedPiece);
+                const resolvedLines = resolveCompletedLines(targetState.board);
+                garbageClearedRows.push(...resolvedLines.clearedRows);
+                garbageClearedColumns.push(...resolvedLines.clearedColumns);
             }
 
             targetState.garbageReceived += placements.length;
             garbageTargets.push({
                 targetUserId,
-                placements
+                placements,
+                clearedRows: garbageClearedRows,
+                clearedColumns: garbageClearedColumns
             });
         }
     }
@@ -437,6 +410,53 @@ function canPlacePiece(board, cells, position) {
             board[y][x] === 0
         );
     });
+}
+
+/**
+ * @param {number[][]} board
+ * @returns {{clearedRows: Array<number>, clearedColumns: Array<number>}}
+ */
+function resolveCompletedLines(board) {
+    const clearedRows = [];
+    const clearedColumns = [];
+
+    for (let row = 0; row < board.length; row += 1) {
+        if (board[row].every((cell) => cell > 0)) {
+            clearedRows.push(row);
+        }
+    }
+
+    for (let column = 0; column < board[0].length; column += 1) {
+        let isFilled = true;
+
+        for (let row = 0; row < board.length; row += 1) {
+            if (board[row][column] === 0) {
+                isFilled = false;
+                break;
+            }
+        }
+
+        if (isFilled) {
+            clearedColumns.push(column);
+        }
+    }
+
+    for (const row of clearedRows) {
+        for (let column = 0; column < board[row].length; column += 1) {
+            board[row][column] = 0;
+        }
+    }
+
+    for (const column of clearedColumns) {
+        for (let row = 0; row < board.length; row += 1) {
+            board[row][column] = 0;
+        }
+    }
+
+    return {
+        clearedRows,
+        clearedColumns
+    };
 }
 
 /**

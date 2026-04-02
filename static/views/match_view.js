@@ -1026,6 +1026,7 @@ export function renderMatchView(root, profile, gameId, options) {
 
         isSubmitting = true;
         setStatus("Invio mossa in corso...", "idle");
+        const previousMoves = currentMoves;
 
         try {
             const { nextState, summary } = applyMove(
@@ -1035,6 +1036,17 @@ export function renderMatchView(root, profile, gameId, options) {
                 0,
                 position
             );
+            const optimisticMove = {
+                id: `optimistic-${Date.now()}`,
+                playerId: localPlayerId,
+                data: {
+                    type: "tetris-turn",
+                    gameState: nextState,
+                    summary
+                },
+                timestamp: new Date().toISOString()
+            };
+            const optimisticMoves = [...currentMoves, optimisticMove];
 
             const selfPlayer = currentGame.players.find((entry) => entry.id === localPlayerId) || null;
             const opponentPlayer = selfPlayer
@@ -1044,6 +1056,7 @@ export function renderMatchView(root, profile, gameId, options) {
             const nextOpponentState = opponentPlayer ? nextState.players[opponentPlayer.id] || null : null;
 
             clearPlacementPreview();
+            currentMoves = optimisticMoves;
 
             if (selfPlayer && nextOwnState) {
                 renderBoardLayout(currentGame, nextState, nextOwnState, selfPlayer, opponentPlayer, nextOpponentState);
@@ -1060,6 +1073,7 @@ export function renderMatchView(root, profile, gameId, options) {
             await refreshGameState();
         } catch (error) {
             clearPlacementPreview();
+            currentMoves = previousMoves;
 
             if (currentGame) {
                 renderGame(currentGame, currentMoves);
