@@ -519,8 +519,16 @@ button:disabled {
     background: rgba(255, 255, 255, 0.04);
 }
 
+.board + .match-sidebar-card {
+    margin-top: 18px;
+}
+
 .status-inline-error {
     margin-top: 16px;
+}
+
+.status-match-outcome {
+    margin-bottom: 20px;
 }
 
 .player-slot-list {

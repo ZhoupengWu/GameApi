@@ -245,6 +245,39 @@ export function renderMatchView(root, profile, gameId, options) {
     }
 
     /**
+     * @param {{ players: Record<string, PlayerBoardState> }} gameState
+     * @param {string} selfPlayerId
+     * @param {string | null} opponentPlayerId
+     * @returns {{type: "win" | "lose", message: string} | null}
+     */
+    function getMatchOutcome(gameState, selfPlayerId, opponentPlayerId) {
+        const selfState = gameState.players[selfPlayerId] || null;
+        const opponentState = opponentPlayerId ? gameState.players[opponentPlayerId] || null : null;
+
+        if (!selfState) {
+            return null;
+        }
+
+        const selfCanMove = hasPlayablePiece(selfState.board, selfState.upcomingPieces);
+
+        if (!selfCanMove) {
+            return {
+                type: "lose",
+                message: "Sconfitta: non hai piu mosse valide."
+            };
+        }
+
+        if (opponentState && !hasPlayablePiece(opponentState.board, opponentState.upcomingPieces)) {
+            return {
+                type: "win",
+                message: "Vittoria: l'avversario non puo piu piazzare pezzi."
+            };
+        }
+
+        return null;
+    }
+
+    /**
      * @param {{ currentTurnUserId?: string | null, players: Record<string, PlayerBoardState> }} gameState
      * @param {string} playerId
      * @returns {boolean}
@@ -385,11 +418,13 @@ export function renderMatchView(root, profile, gameId, options) {
     function renderBoardLayout(game, gameState, ownState, selfPlayer, opponentPlayer, opponentState) {
         const previewCells = getCurrentPreviewCells(ownState);
         const canMoveAtAll = hasPlayablePiece(ownState.board, ownState.upcomingPieces);
+        const matchOutcome = getMatchOutcome(gameState, selfPlayer.id, opponentPlayer ? opponentPlayer.id : null);
         const isLocalTurn = isPlayerTurn(gameState, selfPlayer.id);
         const turnLabel = gameState.currentTurnUserId
             ? game.players.find((entry) => entry.id === gameState.currentTurnUserId)?.name || "Player sconosciuto"
             : "In attesa";
         const turnNumber = gameState.version + 1;
+        const canDragPieces = isLocalTurn && canMoveAtAll && !matchOutcome;
 
         matchContent.innerHTML = `
             <div class="match-player-banner">
@@ -408,6 +443,12 @@ export function renderMatchView(root, profile, gameId, options) {
                 </div>
             </div>
 
+            ${matchOutcome ? `
+                <div class="status status-match-outcome" data-state="${matchOutcome.type === "win" ? "success" : "error"}">
+                    ${escapeHtml(matchOutcome.message)}
+                </div>
+            ` : ""}
+
             <div class="match-grid">
                 <section class="board-section">
                     <div class="panel-header panel-header-inline">
@@ -424,7 +465,7 @@ export function renderMatchView(root, profile, gameId, options) {
                     <div class="match-sidebar-card">
                         <p class="panel-kicker">Pezzi disponibili</p>
                         <p class="muted-copy">Trascina un pezzo sulla griglia quando e il tuo turno. Se completi una riga o colonna, sull'avversario compare un pezzo casuale in una posizione valida.</p>
-                        ${renderPieceQueueHtml(ownState.upcomingPieces, isLocalTurn && canMoveAtAll)}
+                        ${renderPieceQueueHtml(ownState.upcomingPieces, canDragPieces)}
                     </div>
 
                     <div id="own-board" class="board" aria-label="Griglia personale">
@@ -432,7 +473,9 @@ export function renderMatchView(root, profile, gameId, options) {
                     </div>
 
                     <p class="status ${canMoveAtAll ? "" : "status-inline-error"}" data-state="${canMoveAtAll ? "idle" : "error"}">
-                        ${!isLocalTurn
+                        ${matchOutcome
+                            ? matchOutcome.message
+                            : !isLocalTurn
                             ? "Attendi il turno dell'altro player."
                             : canMoveAtAll
                                 ? "Posiziona un pezzo trascinandolo sulla tua griglia."
@@ -671,6 +714,12 @@ export function renderMatchView(root, profile, gameId, options) {
             }
 
             const gameState = getLatestGameState(currentGame.players, currentMoves);
+            const opponentPlayer = currentGame.players.find((entry) => entry.id !== selfPlayer.id) || null;
+
+            if (getMatchOutcome(gameState, selfPlayer.id, opponentPlayer ? opponentPlayer.id : null)) {
+                return false;
+            }
+
             return isPlayerTurn(gameState, selfPlayer.id);
         }
 
