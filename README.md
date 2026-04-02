@@ -120,4 +120,5 @@ Il flusso previsto dal frontend e questo:
 - Se completi una o piu righe o colonne, nella griglia dell'altro player compare un pezzo casuale completo in una posizione valida casuale per ogni linea completata.
 - I blocchi gia piazzati restano fissi sulla griglia finche non vengono rimossi dal completamento di una riga o colonna.
 - Se un player non ha piu nessun piazzamento valido con i pezzi disponibili, la partita mostra vittoria o sconfitta e blocca ulteriori mosse.
+- A fine partita compare un overlay di esito con uscita dalla partita o ritorno alla lobby; lo stato della lobby viene aggiornato come completato con il nome del vincitore.
 - La sincronizzazione tra i browser usa le mosse salvate via API e aggiornamenti locali via `BroadcastChannel` o evento `storage`.

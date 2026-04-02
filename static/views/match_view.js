@@ -109,6 +109,8 @@ export function renderMatchView(root, profile, gameId, options) {
     let isEditingLocalPlayerName = false;
     let localPlayerDraftName = "";
     let isAutoSelectingLocalPlayer = false;
+    let isCompletingMatch = false;
+    let finalizedMatchStatus = "";
     /** @type {BroadcastChannel | null} */
     let syncChannel = null;
 
@@ -126,6 +128,13 @@ export function renderMatchView(root, profile, gameId, options) {
      */
     function getMatchSyncChannelName() {
         return `${MATCH_SYNC_KEY_PREFIX}:${gameId}`;
+    }
+
+    /**
+     * @returns {string}
+     */
+    function getMatchFinalStatus(winnerName) {
+        return `completed - winner: ${winnerName}`;
     }
 
     /**
@@ -278,6 +287,67 @@ export function renderMatchView(root, profile, gameId, options) {
     }
 
     /**
+     * @param {{ players: Record<string, PlayerBoardState> }} gameState
+     * @param {Array<{id: string, name: string}>} players
+     * @returns {{ winnerId: string, winnerName: string, loserId: string, status: string } | null}
+     */
+    function getMatchCompletion(gameState, players) {
+        if (players.length < 2) {
+            return null;
+        }
+
+        const [firstPlayer, secondPlayer] = players;
+        const firstState = gameState.players[firstPlayer.id] || null;
+        const secondState = gameState.players[secondPlayer.id] || null;
+
+        if (!firstState || !secondState) {
+            return null;
+        }
+
+        const firstCanMove = hasPlayablePiece(firstState.board, firstState.upcomingPieces);
+        const secondCanMove = hasPlayablePiece(secondState.board, secondState.upcomingPieces);
+
+        if (firstCanMove === secondCanMove) {
+            return null;
+        }
+
+        const winner = firstCanMove ? firstPlayer : secondPlayer;
+        const loser = firstCanMove ? secondPlayer : firstPlayer;
+
+        return {
+            winnerId: winner.id,
+            winnerName: winner.name,
+            loserId: loser.id,
+            status: getMatchFinalStatus(winner.name)
+        };
+    }
+
+    /**
+     * @param {GameDetails} game
+     * @param {{ players: Record<string, PlayerBoardState> }} gameState
+     */
+    async function ensureMatchCompleted(game, gameState) {
+        const completion = getMatchCompletion(gameState, game.players);
+
+        if (!completion || isCompletingMatch || game.status === completion.status || finalizedMatchStatus === completion.status) {
+            return;
+        }
+
+        isCompletingMatch = true;
+
+        try {
+            await player.updateGame(game.id, game.name, completion.status);
+            finalizedMatchStatus = completion.status;
+            broadcastMatchUpdate("match-completed");
+        } catch (error) {
+            const message = error instanceof Error ? error.message : "Errore sconosciuto";
+            setStatus(`Match terminato, ma stato non aggiornato: ${message}`, "error");
+        } finally {
+            isCompletingMatch = false;
+        }
+    }
+
+    /**
      * @param {{ currentTurnUserId?: string | null, players: Record<string, PlayerBoardState> }} gameState
      * @param {string} playerId
      * @returns {boolean}
@@ -419,6 +489,7 @@ export function renderMatchView(root, profile, gameId, options) {
         const previewCells = getCurrentPreviewCells(ownState);
         const canMoveAtAll = hasPlayablePiece(ownState.board, ownState.upcomingPieces);
         const matchOutcome = getMatchOutcome(gameState, selfPlayer.id, opponentPlayer ? opponentPlayer.id : null);
+        const matchCompletion = getMatchCompletion(gameState, game.players);
         const isLocalTurn = isPlayerTurn(gameState, selfPlayer.id);
         const turnLabel = gameState.currentTurnUserId
             ? game.players.find((entry) => entry.id === gameState.currentTurnUserId)?.name || "Player sconosciuto"
@@ -444,8 +515,19 @@ export function renderMatchView(root, profile, gameId, options) {
             </div>
 
             ${matchOutcome ? `
-                <div class="status status-match-outcome" data-state="${matchOutcome.type === "win" ? "success" : "error"}">
-                    ${escapeHtml(matchOutcome.message)}
+                <div class="match-outcome-overlay" role="dialog" aria-modal="true" aria-label="Esito partita">
+                    <div class="match-outcome-card">
+                        <p class="panel-kicker">Partita terminata</p>
+                        <h2>${matchOutcome.type === "win" ? "Hai vinto" : "Hai perso"}</h2>
+                        <p class="muted-copy">${escapeHtml(matchOutcome.message)}</p>
+                        <p class="muted-copy">
+                            ${escapeHtml(matchCompletion ? `Stato lobby: ${matchCompletion.status}` : game.status)}
+                        </p>
+                        <div class="match-actions">
+                            <button id="leave-match-button" type="button">Esci dalla partita</button>
+                            <button id="back-to-lobby-button" class="secondary-button" type="button">Torna alla lobby</button>
+                        </div>
+                    </div>
                 </div>
             ` : ""}
 
@@ -517,6 +599,24 @@ export function renderMatchView(root, profile, gameId, options) {
         `;
 
         bindBoardInteractions(game, selfPlayer, ownState);
+
+        root.querySelector("#leave-match-button")?.addEventListener("click", async () => {
+            try {
+                setStatus("Uscita dalla partita in corso...", "idle");
+                await player.removePlayerFromGame(game.id, selfPlayer.id);
+                clearLocalPlayerId();
+                clearPlacementPreview();
+                broadcastMatchUpdate("player-left-after-match");
+                options.onBack();
+            } catch (error) {
+                const message = error instanceof Error ? error.message : "Errore sconosciuto";
+                setStatus(message, "error");
+            }
+        });
+
+        root.querySelector("#back-to-lobby-button")?.addEventListener("click", () => {
+            options.onBack();
+        });
     }
 
     /**
@@ -534,6 +634,12 @@ export function renderMatchView(root, profile, gameId, options) {
         const gameState = getLatestGameState(game.players, moves);
         const ownState = selfPlayer ? gameState.players[selfPlayer.id] : null;
         const opponentState = opponentPlayer ? gameState.players[opponentPlayer.id] : null;
+
+        ensureMatchCompleted(game, gameState);
+
+        if (game.status.startsWith("completed")) {
+            setStatus(`Partita completata: ${game.status}`, "success");
+        }
 
         if (selectedPlayerId && !selfPlayer) {
             clearLocalPlayerId();
