@@ -14,9 +14,12 @@ Regole operative:
 - Le API pubbliche non protette sono sotto `/auth`; le route protette usano header `X-API-Key`.
 - Prima di cambiare il frontend, verifica sempre come il backend espone le route e da quale path viene servito il client.
 - Evita sprechi: fai modifiche piccole, riusa i moduli esistenti e non introdurre librerie o strutture nuove senza motivo.
+- Quando una modifica cambia il comportamento reale del repo, aggiorna anche la documentazione locale in `.ai/` se tocca contesto, mappa repo o note frontend/backend.
 
 Contesto attuale:
 
 - Gioco in sviluppo: Tetris.
 - Registrazione frontend collegata a `static/client_auth.js`.
 - Entry point frontend: `static/index.js`.
+- Il match Tetris e una vista client-side servita da `/frontend`, con sincronizzazione tra tab via `BroadcastChannel` e fallback `storage`.
+- Il frontend usa la stessa API key per piu tab/browser, ma ogni tab sceglie un player locale distinto dentro la lobby.

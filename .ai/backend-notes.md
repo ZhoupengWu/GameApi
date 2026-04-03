@@ -52,6 +52,7 @@
 - Game: `id`, `name`, `ownerId`, `players`, `moves`, `status`, `createdAt`, `updatedAt`
 - Player embedded nel game: `id`, `name`, `joinedAt`
 - Move embedded nel game: `id`, `playerId`, `data`, `timestamp`
+- Lo stato Tetris completo viene salvato dentro `move.data.gameState` dal frontend
 
 ## Osservazioni importanti
 
@@ -60,3 +61,4 @@
 - In pratica il proprietario del gioco puo sempre inviare mosse; l'uso di utenti registrati come player e al momento incoerente
 - Il README mostra esempi base, ma la fonte di verita sulle autorizzazioni e il codice route
 - `src/swagger.js` punta a un server URL hardcoded di sviluppo remoto, non a `http://localhost:3000`
+- Il frontend corrente aggira questa incoerenza usando di fatto la API key del proprietario per creare player embedded e inviare mosse del match

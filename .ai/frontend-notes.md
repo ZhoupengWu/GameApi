@@ -37,8 +37,9 @@
 - Schermata iniziale con due ingressi: registrazione nuova API key o incolla API key condivisa
 - Lobby con creazione partita, lista partite e apertura tramite id
 - Match view dove ogni tab seleziona il proprio player locale nella lobby
-- Gameplay Tetris con tre pedine (`I`, `O`, `T`) e doppia griglia
-- Polling periodico delle mosse salvate nel backend
+- Gameplay Tetris a due con doppia griglia, turni alternati, queue di tre pezzi e pezzi disturbo sull'avversario
+- Catalogo pezzi piu ampio dei tetramini classici: il motore include anche forme custom in `static/game/tetris_engine.js`
+- Sincronizzazione match tra tab/browser tramite `BroadcastChannel` e fallback `storage`; il refresh backend avviene quando serve, non con polling periodico fisso
 
 ## Vincoli tecnici
 
@@ -46,6 +47,8 @@
 - Questo funziona perche il frontend viene servito dallo stesso server Node
 - Gli elementi DOM in `static/index.js` sono recuperati con helper tipizzato `getRequiredElement()`
 - Questo e stato introdotto per ridurre warning `checkJs` su elementi potenzialmente `null`
+- Il player locale della lobby viene ricordato per tab in `sessionStorage`
+- Il nome player preferito viene ricordato per coppia `apiKey + gameId` in `localStorage`
 
 ## Comportamenti backend che impattano il frontend
 
@@ -55,6 +58,7 @@
 - `GET /games` mostra le lobby create dall'utente proprietario della API key
 - `POST /games/:gameId/players` viene usata per registrare i nomi player locali dentro la partita
 - `POST /games/:gameId/moves` viene usata per sincronizzare lo stato Tetris
+- `GET /games/:gameId/moves` e `POST /games/:gameId/moves` permettono di operare al proprietario del game; il controllo "player autenticato" nel backend resta disallineato rispetto agli embedded player
 
 ## Attenzioni utili
 

@@ -30,6 +30,8 @@
 - Frontend statico: `static/index.html`
 - Entry JS frontend: `static/index.js`
 - Client API browser: `static/client_auth.js`
+- Vista match Tetris: `static/views/match_view.js`
+- Motore di gioco Tetris: `static/game/tetris_engine.js`
 
 ## Routing reale
 
@@ -70,3 +72,6 @@
 - `static/index.js` gestisce il routing hash tra lobby e match
 - `static/client_auth.js` esporta `Player`
 - Il frontend salva la sessione locale del giocatore in `localStorage` con chiave `tetris-player-session`
+- Ogni tab salva il player locale scelto in `sessionStorage` e il nome preferito in `localStorage`
+- La sincronizzazione del match tra tab usa `BroadcastChannel` e fallback su evento `storage`, con refresh on demand
+- Il motore Tetris client non usa solo i pezzi classici `I/O/T`: il catalogo include piu forme custom definite in `static/game/tetris_engine.js`

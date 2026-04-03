@@ -6,6 +6,10 @@
 - `package-lock.json`: lock npm
 - `README.md`: guida rapida installazione e uso API
 - `AGENTS.md`: istruzioni operative repository-level
+- `.ai/project-context.md`: contesto sintetico del progetto
+- `.ai/repo-map.md`: mappa rapida del repository
+- `.ai/frontend-notes.md`: note operative sul client statico
+- `.ai/backend-notes.md`: note operative sulle API e sulla persistenza
 
 ## Backend
 
@@ -45,3 +49,4 @@
 - Poi leggere `src/routes/*.js` per comportamento API reale
 - Poi leggere `src/db/database.js` per modello dati e limiti della persistenza
 - Solo dopo aggiornare o usare il frontend in `static/`
+- Se serve contesto veloce, allineare anche i file in `.ai/` quando il comportamento reale cambia
