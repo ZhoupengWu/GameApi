@@ -1356,9 +1356,10 @@ export function renderMatchView(root, profile, gameId, options) {
  */
 function renderBoardHtml(board, previewCells, interactive) {
     const previewIndex = new Set(previewCells.map((cell) => `${cell.x}:${cell.y}`));
+    const boardSize = board[0]?.length || 0;
 
     return `
-        <div class="board-grid ${interactive ? "board-grid-interactive" : ""}">
+        <div class="board-grid ${interactive ? "board-grid-interactive" : ""}" style="--board-size: ${String(boardSize)};">
             ${board.map((row, y) => row.map((cell, x) => {
                 const isPreview = previewIndex.has(`${x}:${y}`);
                 const classNames = ["board-cell"];

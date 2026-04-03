@@ -1,6 +1,29 @@
-const BOARD_SIZE = 8;
+const BOARD_SIZE = 12;
 
 const PIECES = {
+    Q: {
+        id: "Q",
+        label: "Quadratino",
+        cells: [
+            [0, 0]
+        ]
+    },
+    D: {
+        id: "D",
+        label: "Domino",
+        cells: [
+            [0, 0],
+            [1, 0]
+        ]
+    },
+    d: {
+        id: "d",
+        label: "Domino verticale",
+        cells: [
+            [0, 0],
+            [0, 1]
+        ]
+    },
     I: {
         id: "I",
         label: "Linea",
@@ -101,6 +124,37 @@ const PIECES = {
             [0, 1],
             [1, 1],
             [2, 1],
+            [1, 2]
+        ]
+    },
+    r: {
+        id: "r",
+        label: "L ruotata",
+        cells: [
+            [0, 0],
+            [1, 0],
+            [2, 0],
+            [0, 1]
+        ]
+    },
+    t: {
+        id: "t",
+        label: "T ruotata",
+        cells: [
+            [0, 0],
+            [0, 1],
+            [1, 1],
+            [0, 2]
+        ]
+    },
+    u: {
+        id: "u",
+        label: "U ruotata",
+        cells: [
+            [0, 0],
+            [1, 0],
+            [0, 1],
+            [0, 2],
             [1, 2]
         ]
     }
