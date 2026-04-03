@@ -47,6 +47,7 @@ const MATCH_SYNC_KEY_PREFIX = "tetris-match-sync";
  */
 
 /**
+ * Renderizza la vista di una partita e mantiene sincronizzati stato, drag and drop e player locale.
  * @param {HTMLDivElement} root
  * @param {PlayerProfile} profile
  * @param {string} gameId
@@ -121,6 +122,7 @@ export function renderMatchView(root, profile, gameId, options) {
     let syncChannel = null;
 
     /**
+     * Aggiorna il messaggio di stato mostrato sopra il contenuto della partita.
      * @param {string} message
      * @param {"idle" | "success" | "error"} type
      */
@@ -130,6 +132,7 @@ export function renderMatchView(root, profile, gameId, options) {
     }
 
     /**
+     * Costruisce il nome del canale usato per sincronizzare le tab della stessa lobby.
      * @returns {string}
      */
     function getMatchSyncChannelName() {
@@ -137,6 +140,7 @@ export function renderMatchView(root, profile, gameId, options) {
     }
 
     /**
+     * Costruisce la stringa di stato finale da salvare quando la partita termina.
      * @returns {string}
      */
     function getMatchFinalStatus(winnerName) {
@@ -144,6 +148,7 @@ export function renderMatchView(root, profile, gameId, options) {
     }
 
     /**
+     * Estrae il nome del vincitore da uno stato partita completato.
      * @param {string} status
      * @returns {string | null}
      */
@@ -158,6 +163,7 @@ export function renderMatchView(root, profile, gameId, options) {
     }
 
     /**
+     * Restituisce la chiave sessionStorage usata per ricordare il player locale selezionato.
      * @returns {string}
      */
     function getLocalPlayerStorageKey() {
@@ -165,6 +171,7 @@ export function renderMatchView(root, profile, gameId, options) {
     }
 
     /**
+     * Restituisce la chiave localStorage usata per ricordare il nome locale preferito.
      * @returns {string}
      */
     function getLocalPlayerNameStorageKey() {
@@ -172,6 +179,7 @@ export function renderMatchView(root, profile, gameId, options) {
     }
 
     /**
+     * Legge dalla sessione il player locale associato alla tab corrente.
      * @returns {string | null}
      */
     function getLocalPlayerId() {
@@ -179,17 +187,22 @@ export function renderMatchView(root, profile, gameId, options) {
     }
 
     /**
+     * Salva nella sessione il player locale scelto per questa lobby.
      * @param {string} playerId
      */
     function saveLocalPlayerId(playerId) {
         sessionStorage.setItem(getLocalPlayerStorageKey(), playerId);
     }
 
+    /**
+     * Cancella dalla sessione il player locale attualmente selezionato.
+     */
     function clearLocalPlayerId() {
         sessionStorage.removeItem(getLocalPlayerStorageKey());
     }
 
     /**
+     * Suggerisce il nome player da usare per questa tab basandosi su memoria locale e profilo.
      * @returns {string}
      */
     function getSuggestedLocalPlayerName() {
@@ -207,6 +220,7 @@ export function renderMatchView(root, profile, gameId, options) {
     }
 
     /**
+     * Memorizza o rimuove il nome player preferito per questa lobby e API key.
      * @param {string} playerName
      */
     function saveLocalPlayerName(playerName) {
@@ -221,6 +235,7 @@ export function renderMatchView(root, profile, gameId, options) {
     }
 
     /**
+     * Notifica alle altre tab che lo stato della partita e cambiato.
      * @param {string} reason
      */
     function broadcastMatchUpdate(reason) {
@@ -237,12 +252,18 @@ export function renderMatchView(root, profile, gameId, options) {
         localStorage.setItem(getMatchSyncChannelName(), JSON.stringify(payload));
     }
 
+    /**
+     * Azzera il pezzo trascinato e la relativa anteprima sulla griglia.
+     */
     function clearPlacementPreview() {
         localState.draggedPieceId = null;
         localState.previewPosition = null;
         localState.dragAnchorCell = { x: 0, y: 0 };
     }
 
+    /**
+     * Chiude l'interazione drag corrente ed eventualmente rilancia un refresh rinviato.
+     */
     function finishDragInteraction() {
         isDraggingPiece = false;
 
@@ -253,6 +274,7 @@ export function renderMatchView(root, profile, gameId, options) {
     }
 
     /**
+     * Aggiorna il pezzo trascinato e la sua posizione di anteprima sulla board.
      * @param {string} pieceId
      * @param {number} x
      * @param {number} y
@@ -263,6 +285,7 @@ export function renderMatchView(root, profile, gameId, options) {
     }
 
     /**
+     * Restituisce le celle di anteprima correnti per la griglia del player locale.
      * @param {PlayerBoardState} ownState
      * @returns {Array<{x: number, y: number}>}
      */
@@ -275,6 +298,7 @@ export function renderMatchView(root, profile, gameId, options) {
     }
 
     /**
+     * Verifica se almeno uno dei pezzi in coda puo essere piazzato sulla board.
      * @param {number[][]} board
      * @param {Array<string>} upcomingPieces
      * @returns {boolean}
@@ -284,6 +308,7 @@ export function renderMatchView(root, profile, gameId, options) {
     }
 
     /**
+     * Calcola l'esito live della partita per il player locale.
      * @param {{ players: Record<string, PlayerBoardState> }} gameState
      * @param {string} selfPlayerId
      * @param {string | null} opponentPlayerId
@@ -317,6 +342,7 @@ export function renderMatchView(root, profile, gameId, options) {
     }
 
     /**
+     * Traduce uno stato gia persistito della lobby in un esito locale win/lose.
      * @param {GameDetails} game
      * @param {{id: string, name: string}} selfPlayer
      * @returns {{type: "win" | "lose", message: string} | null}
@@ -337,6 +363,7 @@ export function renderMatchView(root, profile, gameId, options) {
     }
 
     /**
+     * Determina se la partita e conclusa e chi ne e il vincitore.
      * @param {{ players: Record<string, PlayerBoardState> }} gameState
      * @param {Array<{id: string, name: string}>} players
      * @returns {{ winnerId: string, winnerName: string, loserId: string, status: string } | null}
@@ -373,6 +400,7 @@ export function renderMatchView(root, profile, gameId, options) {
     }
 
     /**
+     * Aggiorna sul backend lo stato finale della lobby quando emerge un vincitore.
      * @param {GameDetails} game
      * @param {{ players: Record<string, PlayerBoardState> }} gameState
      */
@@ -398,6 +426,7 @@ export function renderMatchView(root, profile, gameId, options) {
     }
 
     /**
+     * Verifica se il player indicato e quello che deve giocare in questo turno.
      * @param {{ currentTurnUserId?: string | null, players: Record<string, PlayerBoardState> }} gameState
      * @param {string} playerId
      * @returns {boolean}
@@ -413,6 +442,7 @@ export function renderMatchView(root, profile, gameId, options) {
     }
 
     /**
+     * Se possibile seleziona o crea automaticamente il player locale per la tab corrente.
      * @param {GameDetails} game
      * @returns {Promise<boolean>}
      */
@@ -461,6 +491,7 @@ export function renderMatchView(root, profile, gameId, options) {
     }
 
     /**
+     * Renderizza la coda dei pezzi ancora disponibili per il player locale.
      * @param {Array<string>} upcomingPieces
      * @returns {string}
      */
@@ -493,6 +524,7 @@ export function renderMatchView(root, profile, gameId, options) {
     }
 
     /**
+     * Genera il markup miniaturizzato di un singolo pezzo della coda.
      * @param {string} pieceId
      * @returns {string}
      */
@@ -515,6 +547,7 @@ export function renderMatchView(root, profile, gameId, options) {
     }
 
     /**
+     * Aggiorna solo l'overlay di anteprima sulla board personale gia renderizzata.
      * @param {PlayerBoardState} ownState
      */
     function updateOwnBoardPreview(ownState) {
@@ -528,6 +561,7 @@ export function renderMatchView(root, profile, gameId, options) {
     }
 
     /**
+     * Renderizza l'interfaccia di gioco per player locale, avversario e queue pezzi.
      * @param {GameDetails} game
      * @param {{ currentTurnUserId?: string | null, version: number, players: Record<string, PlayerBoardState> }} gameState
      * @param {PlayerBoardState} ownState
@@ -671,6 +705,7 @@ export function renderMatchView(root, profile, gameId, options) {
     }
 
     /**
+     * Ricostruisce l'intera vista partita a partire dai dati correnti di lobby e mosse.
      * @param {GameDetails} game
      * @param {Array<{id: string, playerId: string, data: Record<string, unknown>, timestamp: string}>} moves
      */
@@ -707,6 +742,7 @@ export function renderMatchView(root, profile, gameId, options) {
     }
 
     /**
+     * Mostra la schermata in cui la tab sceglie o crea il proprio player locale.
      * @param {GameDetails} game
      */
     function renderPlayerSetup(game) {
@@ -755,6 +791,7 @@ export function renderMatchView(root, profile, gameId, options) {
         const existingPlayersList = root.querySelector("#existing-players-list");
 
         /**
+         * Aggiorna il messaggio di stato del form di selezione player locale.
          * @param {string} message
          * @param {"idle" | "success" | "error"} type
          */
@@ -855,6 +892,7 @@ export function renderMatchView(root, profile, gameId, options) {
     }
 
     /**
+     * Collega drag and drop e azioni locali ai controlli della board renderizzata.
      * @param {GameDetails} game
      * @param {{id: string, name: string}} selfPlayer
      * @param {PlayerBoardState} ownState
@@ -866,6 +904,7 @@ export function renderMatchView(root, profile, gameId, options) {
         const removeLocalPlayerButton = root.querySelector("#remove-local-player-button");
 
         /**
+         * Ricalcola lo stato live della board del player locale usando i dati correnti.
          * @returns {PlayerBoardState | null}
          */
         function getLiveOwnState() {
@@ -877,6 +916,9 @@ export function renderMatchView(root, profile, gameId, options) {
             return gameState.players[selfPlayer.id] || null;
         }
 
+        /**
+         * Stabilisce se l'utente puo interagire con la board in questo preciso momento.
+         */
         function canInteractThisTurn() {
             if (!currentGame) {
                 return false;
@@ -1122,6 +1164,7 @@ export function renderMatchView(root, profile, gameId, options) {
     }
 
     /**
+     * Applica optimistic UI, salva la mossa sul backend e sincronizza la partita.
      * @param {string} localPlayerId
      * @param {string} pieceId
      * @param {{x: number, y: number}} position
@@ -1237,6 +1280,9 @@ export function renderMatchView(root, profile, gameId, options) {
         }
     }
 
+    /**
+     * Ricarica partita e mosse dal backend rispettando drag in corso e richieste obsolete.
+     */
     async function refreshGameState() {
         if (disposed) {
             return;
@@ -1296,6 +1342,7 @@ export function renderMatchView(root, profile, gameId, options) {
     }
 
     /**
+     * Gestisce i messaggi di sincronizzazione ricevuti via BroadcastChannel.
      * @param {MessageEvent} event
      */
     function onSyncMessage(event) {
@@ -1311,6 +1358,7 @@ export function renderMatchView(root, profile, gameId, options) {
     }
 
     /**
+     * Gestisce la sincronizzazione tra tab quando cambia la chiave storage della lobby.
      * @param {StorageEvent} event
      */
     function onStorage(event) {
@@ -1349,6 +1397,7 @@ export function renderMatchView(root, profile, gameId, options) {
 }
 
 /**
+ * Genera il markup HTML della board con celle occupate, garbage e anteprima.
  * @param {number[][]} board
  * @param {Array<{x: number, y: number}>} previewCells
  * @param {boolean} interactive
@@ -1389,9 +1438,7 @@ function renderBoardHtml(board, previewCells, interactive) {
 }
 
 /**
- * Keep the board DOM stable during drag and only toggle preview classes.
- * Replacing the grid while dragging can cause browsers to lose the pending drop event.
- *
+ * Mantiene stabile il DOM della board durante il drag aggiornando solo le classi preview.
  * @param {HTMLDivElement} ownBoard
  * @param {Array<{x: number, y: number}>} previewCells
  */
@@ -1414,6 +1461,7 @@ function syncBoardPreview(ownBoard, previewCells) {
 }
 
 /**
+ * Limita l'offset del drag all'interno dell'elemento usato come drag image.
  * @param {number} value
  * @param {number} max
  * @returns {number}
@@ -1427,6 +1475,7 @@ function clampDragOffset(value, max) {
 }
 
 /**
+ * Calcola quale cella del pezzo miniatura e piu vicina al punto di presa del drag.
  * @param {string} pieceId
  * @param {HTMLElement} pieceMiniBoard
  * @param {number} offsetX
@@ -1465,6 +1514,7 @@ function getDragAnchorCell(pieceId, pieceMiniBoard, offsetX, offsetY) {
 }
 
 /**
+ * Scrive in console i passaggi del flusso drag/drop per debug locale.
  * @param {string} step
  * @param {Record<string, unknown>} [details]
  */
@@ -1473,6 +1523,7 @@ function debugMoveFlow(step, details = {}) {
 }
 
 /**
+ * Crea una board quadrata vuota usata per placeholder e stato avversario mancante.
  * @param {number} [size]
  * @returns {number[][]}
  */

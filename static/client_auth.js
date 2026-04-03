@@ -59,7 +59,7 @@ export class Player {
     #player_information;
 
     /**
-     * Create and register a new player
+     * Crea un client giocatore e, se serve, registra subito l'utente sul backend.
      * @param {string} name name of the player
      * @param {user} [existingProfile]
      */
@@ -83,7 +83,7 @@ export class Player {
     }
 
     /**
-     * Rebuild a client instance from an already registered profile.
+     * Ricostruisce un client a partire da un profilo gia registrato.
      * @param {user} profile
      * @returns {Player}
      */
@@ -92,7 +92,7 @@ export class Player {
     }
 
     /**
-     * Create a client bound to a shared api key already distributed outside the app.
+     * Crea un client locale collegato a una API key condivisa gia esistente.
      * @param {string} apiKey
      * @param {string} [label]
      * @returns {Player}
@@ -107,7 +107,7 @@ export class Player {
     }
 
     /**
-     * Get the name of the player
+     * Restituisce il nome con cui il client identifica il giocatore.
      * @returns {string}
      */
     getName() {
@@ -115,7 +115,7 @@ export class Player {
     }
 
     /**
-     * Wait until the player registration has completed
+     * Attende la fine della registrazione e restituisce il profilo completo del giocatore.
      * @returns {Promise<user>}
      */
     async waitUntilReady() {
@@ -124,7 +124,7 @@ export class Player {
     }
 
     /**
-     * Get the registered player information
+     * Restituisce una copia dei dati del profilo associato al client.
      * @returns {user}
      */
     getProfile() {
@@ -136,7 +136,7 @@ export class Player {
     }
 
     /**
-     * Get the api key
+     * Legge la API key del profilo registrato o condiviso.
      * @returns {string}
      */
     #getApiKey() {
@@ -148,7 +148,7 @@ export class Player {
     }
 
     /**
-     * Wait until the player registration has completed
+     * Aspetta che l'inizializzazione asincrona del client sia terminata.
      * @returns {Promise<void>}
      */
     async #ensureReady() {
@@ -156,7 +156,7 @@ export class Player {
     }
 
     /**
-     * Register the user
+     * Registra un nuovo utente sulle route pubbliche di autenticazione.
      * @returns {Promise<user>} information of the player
      */
     async #register() {
@@ -191,7 +191,7 @@ export class Player {
     }
 
     /**
-     * Execute an authenticated API request and normalize error handling.
+     * Esegue una richiesta autenticata verso il backend uniformando la gestione degli errori.
      * @template T
      * @param {string} path
      * @param {RequestInit} [options]
@@ -229,7 +229,7 @@ export class Player {
     }
 
     /**
-     * Create a game
+     * Crea una nuova lobby di gioco intestata all'utente corrente.
      * @param {string} name_game name of the game
      * @returns {Promise<{message: string, game: game}>}
      */
@@ -246,7 +246,7 @@ export class Player {
     }
 
     /**
-     * Show a list of games
+     * Recupera l'elenco delle partite accessibili all'utente autenticato.
      * @returns {Promise<Array<game>>}
      */
     async listGame() {
@@ -261,7 +261,7 @@ export class Player {
     }
 
     /**
-     * Get a game
+     * Recupera i dettagli di una specifica partita.
      * @param {string} game_id game id
      * @returns {Promise<game>}
      */
@@ -277,7 +277,7 @@ export class Player {
     }
 
     /**
-     * Update the game
+     * Aggiorna nome e stato di una partita esistente.
      * @param {string} game_id game id
      * @param {string} new_name set new name of the game
      * @param {string} new_status set new status (active / inactive)
@@ -302,7 +302,7 @@ export class Player {
     }
 
     /**
-     * Delete a game
+     * Elimina una partita dal backend.
      * @param {string} game_id game id
      * @returns {Promise<string>}
      */
@@ -315,7 +315,7 @@ export class Player {
     }
 
     /**
-     * Add a player to a game.
+     * Aggiunge un player locale alla lobby indicata.
      * @param {string} game_id
      * @param {string} player_name
      * @returns {Promise<{message: string, player: gamePlayer}>}
@@ -333,7 +333,7 @@ export class Player {
     }
 
     /**
-     * Get all players for a game.
+     * Recupera tutti i player associati a una partita.
      * @param {string} game_id
      * @returns {Promise<Array<gamePlayer>>}
      */
@@ -346,7 +346,7 @@ export class Player {
     }
 
     /**
-     * Remove a player from a game.
+     * Rimuove un player specifico dalla partita indicata.
      * @param {string} game_id
      * @param {string} player_id
      * @returns {Promise<{message: string}>}
@@ -358,7 +358,7 @@ export class Player {
     }
 
     /**
-     * Add a move to a game.
+     * Registra una nuova mossa all'interno della partita.
      * @param {string} game_id
      * @param {string} player_id
      * @param {Record<string, unknown>} move_data
@@ -378,7 +378,7 @@ export class Player {
     }
 
     /**
-     * Get all moves for a game.
+     * Recupera lo storico completo delle mosse di una partita.
      * @param {string} game_id
      * @returns {Promise<Array<gameMove>>}
      */
@@ -391,7 +391,7 @@ export class Player {
     }
 
     /**
-     * Get a single move for a game.
+     * Recupera i dettagli di una singola mossa salvata.
      * @param {string} game_id
      * @param {string} move_id
      * @returns {Promise<gameMove>}

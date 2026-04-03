@@ -24,6 +24,7 @@ import { escapeHtml, getRequiredElement } from "../utils/dom.js";
  */
 
 /**
+ * Renderizza la lobby principale e collega le azioni di creazione e apertura partita.
  * @param {HTMLDivElement} root
  * @param {PlayerProfile} profile
  * @param {{ onLogout: () => void, onOpenGame: (gameId: string) => void }} options
@@ -109,6 +110,7 @@ export function renderLobbyView(root, profile, options) {
     const gamesList = getRequiredElement(root, "#games-list", HTMLDivElement);
 
     /**
+     * Aggiorna un elemento di stato con testo e severita visuale.
      * @param {HTMLParagraphElement} element
      * @param {string} message
      * @param {"idle" | "success" | "error"} type
@@ -119,6 +121,7 @@ export function renderLobbyView(root, profile, options) {
     }
 
     /**
+     * Blocca o sblocca il form di creazione durante le richieste in corso.
      * @param {boolean} isLoading
      */
     function setCreateLoading(isLoading) {
@@ -128,6 +131,7 @@ export function renderLobbyView(root, profile, options) {
     }
 
     /**
+     * Disegna la lista delle lobby recuperate dal backend.
      * @param {Array<GameSummary>} games
      */
     function renderAccessibleGames(games) {
@@ -165,6 +169,9 @@ export function renderLobbyView(root, profile, options) {
         `).join("");
     }
 
+    /**
+     * Ricarica dal backend l'elenco delle partite accessibili e aggiorna la vista.
+     */
     async function loadAccessibleGames() {
         refreshGamesButton.disabled = true;
         setStatus(gamesStatus, "Caricamento partite...", "idle");
@@ -182,6 +189,9 @@ export function renderLobbyView(root, profile, options) {
         }
     }
 
+    /**
+     * Valida l'id digitato manualmente e apre la lobby corrispondente.
+     */
     function openGameById() {
         const gameId = openGameInput.value.trim();
 

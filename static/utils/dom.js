@@ -1,4 +1,5 @@
 /**
+ * Cerca un elemento nel DOM e verifica che sia del tipo richiesto.
  * @template {Element} T
  * @param {ParentNode} scope
  * @param {string} selector
@@ -16,6 +17,7 @@ export function getRequiredElement(scope, selector, expectedType) {
 }
 
 /**
+ * Escapa i caratteri HTML per stampare testo utente senza interpretarlo come markup.
  * @param {string} value
  * @returns {string}
  */

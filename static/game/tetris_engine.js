@@ -199,6 +199,7 @@ const PIECES = {
  */
 
 /**
+ * Restituisce il catalogo semplificato dei pezzi disponibili nel motore.
  * @returns {Array<{id: string, label: string}>}
  */
 export function getPieceCatalog() {
@@ -209,6 +210,7 @@ export function getPieceCatalog() {
 }
 
 /**
+ * Restituisce le celle di un pezzo gia ruotato, pronte per la renderizzazione.
  * @param {string} pieceId
  * @param {number} [rotation]
  * @returns {Array<[number, number]>}
@@ -218,6 +220,7 @@ export function getPieceCellsForRender(pieceId, rotation = 0) {
 }
 
 /**
+ * Costruisce lo stato iniziale della partita a partire dai player presenti.
  * @param {Array<GamePlayer>} players
  * @returns {TetrisGameState}
  */
@@ -245,6 +248,7 @@ export function createInitialGameState(players) {
 }
 
 /**
+ * Ricostruisce l'ultimo stato valido della partita leggendo le mosse salvate.
  * @param {Array<GamePlayer>} players
  * @param {Array<GameMove>} moves
  * @returns {TetrisGameState}
@@ -263,6 +267,7 @@ export function getLatestGameState(players, moves) {
 }
 
 /**
+ * Applica una mossa al game state, aggiorna turni, linee e pezzi disturbo.
  * @param {TetrisGameState} state
  * @param {string} userId
  * @param {string} pieceId
@@ -332,6 +337,7 @@ export function applyMove(state, userId, pieceId, rotation, position) {
 }
 
 /**
+ * Calcola le celle di anteprima di un pezzo se la posizione richiesta e valida.
  * @param {number[][]} board
  * @param {string} pieceId
  * @param {number} rotation
@@ -352,6 +358,7 @@ export function getPreviewCells(board, pieceId, rotation, position) {
 }
 
 /**
+ * Riporta la posizione del pezzo entro i limiti disponibili della griglia.
  * @param {number[][]} board
  * @param {string} pieceId
  * @param {number} rotation
@@ -369,6 +376,7 @@ export function clampPosition(board, pieceId, rotation, position) {
 }
 
 /**
+ * Cerca la prima posizione valida in cui il pezzo puo essere piazzato.
  * @param {number[][]} board
  * @param {string} pieceId
  * @param {number} rotation
@@ -390,6 +398,7 @@ export function findFirstValidPosition(board, pieceId, rotation) {
 }
 
 /**
+ * Verifica se sulla griglia esiste almeno una mossa disponibile.
  * @param {number[][]} board
  * @returns {boolean}
  */
@@ -400,6 +409,7 @@ export function hasAnyMove(board) {
 }
 
 /**
+ * Restituisce l'identificatore logico del player preferendo `userId` quando presente.
  * @param {GamePlayer} player
  * @returns {string}
  */
@@ -408,6 +418,7 @@ export function getPlayerUserId(player) {
 }
 
 /**
+ * Costruisce le coordinate normalizzate del pezzo dopo aver applicato la rotazione richiesta.
  * @param {string} pieceId
  * @param {number} rotation
  * @returns {Array<[number, number]>}
@@ -429,6 +440,7 @@ function getPieceCells(pieceId, rotation) {
 }
 
 /**
+ * Ruota di 90 gradi il set di celle di un pezzo.
  * @param {Array<[number, number]>} cells
  * @returns {Array<[number, number]>}
  */
@@ -437,6 +449,7 @@ function rotateCells(cells) {
 }
 
 /**
+ * Trasla le celle del pezzo in modo che partano dall'origine della griglia.
  * @param {Array<[number, number]>} cells
  * @returns {Array<[number, number]>}
  */
@@ -448,6 +461,7 @@ function normalizeCells(cells) {
 }
 
 /**
+ * Controlla se tutte le celle del pezzo entrano in griglia senza collisioni.
  * @param {number[][]} board
  * @param {Array<[number, number]>} cells
  * @param {{x: number, y: number}} position
@@ -469,6 +483,7 @@ function canPlacePiece(board, cells, position) {
 }
 
 /**
+ * Trova righe e colonne complete, le svuota e restituisce quali sono state pulite.
  * @param {number[][]} board
  * @returns {{clearedRows: Array<number>, clearedColumns: Array<number>}}
  */
@@ -516,6 +531,7 @@ function resolveCompletedLines(board) {
 }
 
 /**
+ * Propaga i pezzi disturbo sugli avversari in base alle linee appena completate.
  * @param {TetrisGameState} state
  * @param {string} sourceUserId
  * @param {number} garbageCount
@@ -569,6 +585,7 @@ function propagateGarbage(state, sourceUserId, garbageCount, garbageTargets) {
 }
 
 /**
+ * Calcola larghezza e altezza minime necessarie a contenere un pezzo.
  * @param {Array<[number, number]>} cells
  */
 function getPieceBounds(cells) {
@@ -582,6 +599,7 @@ function getPieceBounds(cells) {
 }
 
 /**
+ * Inserisce casualmente un pezzo disturbo in una posizione valida della griglia.
  * @param {number[][]} board
  * @returns {{pieceId: string, rotation: number, position: {x: number, y: number}} | null}
  */
@@ -628,6 +646,7 @@ function addRandomGarbagePiece(board) {
 }
 
 /**
+ * Restituisce gli id dei player ancora presenti nello stato della partita.
  * @param {Record<string, PlayerBoardState>} players
  * @returns {Array<string>}
  */
@@ -636,6 +655,7 @@ function getActivePlayerIds(players) {
 }
 
 /**
+ * Normalizza il turno corrente assicurando che punti a un player ancora attivo.
  * @param {string | null | undefined} currentTurnUserId
  * @param {Array<string>} activePlayerIds
  * @returns {string | null}
@@ -653,6 +673,7 @@ function normalizeCurrentTurnUserId(currentTurnUserId, activePlayerIds) {
 }
 
 /**
+ * Calcola a chi passa il turno dopo la mossa del player corrente.
  * @param {Array<string>} activePlayerIds
  * @param {string} currentUserId
  * @returns {string | null}
@@ -676,6 +697,7 @@ function getNextTurnUserId(activePlayerIds, currentUserId) {
 }
 
 /**
+ * Allinea uno stato salvato ai player attuali, aggiungendo eventuali board mancanti.
  * @param {Array<GamePlayer>} players
  * @param {TetrisGameState} state
  * @returns {TetrisGameState}
@@ -708,6 +730,7 @@ function normalizeGameState(state, players) {
 }
 
 /**
+ * Verifica in modo leggero se un valore ha la forma minima di uno stato Tetris.
  * @param {unknown} value
  * @returns {value is TetrisGameState}
  */
@@ -722,6 +745,7 @@ function isGameState(value) {
 }
 
 /**
+ * Clona profondamente lo stato di gioco per applicare modifiche senza mutare l'originale.
  * @param {TetrisGameState} state
  * @returns {TetrisGameState}
  */
@@ -749,6 +773,7 @@ function cloneGameState(state) {
 }
 
 /**
+ * Crea una griglia quadrata vuota della dimensione richiesta.
  * @param {number} size
  * @returns {number[][]}
  */
@@ -757,6 +782,7 @@ function createEmptyBoard(size) {
 }
 
 /**
+ * Genera una nuova coda casuale di pezzi con la lunghezza minima richiesta dal gioco.
  * @returns {Array<string>}
  */
 function createUpcomingPieces() {
@@ -766,10 +792,8 @@ function createUpcomingPieces() {
 }
 
 /**
- * Generate a deterministic initial queue for a player.
- * This avoids changing the available pieces every time the client reconstructs
- * the state before the first persisted move exists.
- *
+ * Genera una coda iniziale deterministica per un player cosi da avere sempre
+ * gli stessi primi pezzi prima che esista una mossa persistita.
  * @param {string} seed
  * @returns {Array<string>}
  */
@@ -787,6 +811,7 @@ function createInitialUpcomingPieces(seed) {
 }
 
 /**
+ * Filtra una coda di pezzi non valida e la completa fino alla lunghezza minima.
  * @param {unknown} upcomingPieces
  * @returns {Array<string>}
  */
@@ -800,6 +825,7 @@ function normalizeUpcomingPieces(upcomingPieces) {
 }
 
 /**
+ * Aggiunge pezzi casuali finche la coda non contiene almeno tre elementi.
  * @param {Array<string>} upcomingPieces
  */
 function refillUpcomingPieces(upcomingPieces) {
@@ -809,6 +835,7 @@ function refillUpcomingPieces(upcomingPieces) {
 }
 
 /**
+ * Estrae casualmente l'id di un pezzo dal catalogo disponibile.
  * @returns {string}
  */
 function getRandomPieceId() {
@@ -817,6 +844,7 @@ function getRandomPieceId() {
 }
 
 /**
+ * Calcola un hash numerico stabile a partire da una stringa.
  * @param {string} value
  * @returns {number}
  */
@@ -832,6 +860,7 @@ function hashString(value) {
 }
 
 /**
+ * Limita un numero all'interno dell'intervallo indicato.
  * @param {number} value
  * @param {number} min
  * @param {number} max
@@ -841,6 +870,7 @@ function clamp(value, min, max) {
 }
 
 /**
+ * Normalizza la rotazione nel range da 0 a 3.
  * @param {number} rotation
  * @returns {number}
  */

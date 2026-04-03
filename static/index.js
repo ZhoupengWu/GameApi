@@ -18,6 +18,7 @@ let cleanupCurrentView = () => {};
 let showSessionChooser = false;
 
 /**
+ * Legge l'hash della pagina e restituisce l'id della partita selezionata.
  * @returns {string | null}
  */
 function getRouteGameId() {
@@ -30,6 +31,9 @@ function getRouteGameId() {
     return hash.slice("#game=".length).trim() || null;
 }
 
+/**
+ * Decide quale vista mostrare in base alla sessione salvata e alla route corrente.
+ */
 function renderApp() {
     cleanupCurrentView();
     cleanupCurrentView = () => {};

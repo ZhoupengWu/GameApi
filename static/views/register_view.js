@@ -12,6 +12,7 @@ import { getRequiredElement } from "../utils/dom.js";
  */
 
 /**
+ * Renderizza la schermata di registrazione e gestisce l'avvio di una nuova sessione.
  * @param {HTMLDivElement} root
  * @param {{
  *   existingSession?: PlayerProfile | null,
@@ -151,6 +152,7 @@ export function renderRegisterView(root, options) {
     const forgetSessionButton = root.querySelector("#forget-session-button");
 
     /**
+     * Aggiorna il messaggio di stato della registrazione standard.
      * @param {string} message
      * @param {"idle" | "success" | "error"} type
      */
@@ -160,6 +162,7 @@ export function renderRegisterView(root, options) {
     }
 
     /**
+     * Aggiorna il messaggio di stato dedicato alla sessione condivisa.
      * @param {string} message
      * @param {"idle" | "success" | "error"} type
      */
@@ -169,6 +172,7 @@ export function renderRegisterView(root, options) {
     }
 
     /**
+     * Mostra nel pannello il profilo della sessione appena attivata.
      * @param {PlayerProfile} profile
      */
     function renderPlayerCard(profile) {
@@ -178,6 +182,7 @@ export function renderRegisterView(root, options) {
     }
 
     /**
+     * Abilita o disabilita il form di registrazione principale.
      * @param {boolean} isLoading
      */
     function setLoading(isLoading) {
@@ -187,6 +192,7 @@ export function renderRegisterView(root, options) {
     }
 
     /**
+     * Abilita o disabilita il form di accesso tramite API key condivisa.
      * @param {boolean} isLoading
      */
     function setSharedLoading(isLoading) {
