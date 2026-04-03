@@ -5,6 +5,7 @@ Questo repository e un server Node.js con Express.
 Regole operative:
 
 - Tratta il progetto prima di tutto come backend Node/Express, non come app frontend standalone.
+- Non modificare `src/` se la richiesta puo essere risolta nel client statico; per questo repository le correzioni Tetris/Codespaces vanno fatte in `static/` salvo richiesta esplicita dell'utente.
 - Usa ES modules: `import` / `export`, coerente con `"type": "module"` in `package.json`.
 - Il frontend e servito come statico da `src/index.js` sotto `/frontend`.
 - I file client stanno in `static/` e girano nel browser senza bundler.
