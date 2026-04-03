@@ -39,6 +39,7 @@ Struttura frontend attuale:
 - `static/views/register_view.js`: schermata di registrazione.
 - `static/views/lobby_view.js`: schermata post-login con creazione lobby e apertura partita.
 - `static/views/match_view.js`: partita Tetris a due con player locale per tab.
+- `static/index.css`: layout responsive del client statico, inclusa la griglia Tetris adattiva.
 
 ## API Docs
 Swagger UI is available at:
@@ -113,12 +114,14 @@ Il flusso previsto dal frontend e questo:
 
 ## Tetris implementato
 
-- Due griglie `8x8`, una per player.
-- Coda pezzi composta da `I`, `O`, `T`, `L`, `J`, `S`, `Z`, servita dal backend statico su `/frontend`.
+- Due griglie `12x12`, una per player.
+- Coda pezzi composta da forme classiche e varianti aggiuntive: `Q`, `D`, `d`, `I`, `O`, `T`, `L`, `J`, `S`, `Z`, `U`, `P`, `X`, `r`, `t`, `u`.
 - Interazione via drag and drop dal pannello pezzi alla propria griglia.
+- La partita parte solo quando sono presenti due player; con un solo player la board resta visibile ma le mosse sono bloccate.
 - Turni alternati tra i due player, con indicatore del turno corrente in partita.
 - Se completi una o piu righe o colonne, nella griglia dell'altro player compare un pezzo casuale completo in una posizione valida casuale per ogni linea completata.
 - I blocchi gia piazzati restano fissi sulla griglia finche non vengono rimossi dal completamento di una riga o colonna.
 - Se un player non ha piu nessun piazzamento valido con i pezzi disponibili, la partita mostra vittoria o sconfitta e blocca ulteriori mosse.
 - A fine partita compare un overlay di esito con uscita dalla partita o ritorno alla lobby; lo stato della lobby viene aggiornato come completato con il nome del vincitore.
 - La sincronizzazione tra i browser usa le mosse salvate via API e aggiornamenti locali via `BroadcastChannel` o evento `storage`.
+- Il layout della board e responsive: il numero di colonne viene derivato dalla dimensione reale della griglia e il CSS scala celle e pannelli per desktop, tablet e mobile.

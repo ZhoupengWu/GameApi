@@ -10,6 +10,7 @@
     --success: #5efc8d;
     --error: #ff5d73;
     --shadow: 0 24px 90px rgba(0, 0, 0, 0.35);
+    --board-max-size: min(100%, 680px);
     font-family: "Trebuchet MS", "Segoe UI", sans-serif;
 }
 
@@ -61,6 +62,7 @@ body::before {
     padding: 32px;
     backdrop-filter: blur(18px);
     box-shadow: var(--shadow);
+    overflow: hidden;
 }
 
 .hero-panel {
@@ -109,6 +111,7 @@ h2 {
 .dashboard-title {
     max-width: 14ch;
     font-size: clamp(2.6rem, 6vw, 4.5rem);
+    overflow-wrap: anywhere;
 }
 
 .hero-copy {
@@ -116,6 +119,7 @@ h2 {
     color: var(--text-muted);
     font-size: 1.05rem;
     line-height: 1.6;
+    overflow-wrap: anywhere;
 }
 
 .tetromino-grid {
@@ -234,6 +238,7 @@ button:disabled {
 .welcome-copy,
 .muted-copy {
     color: var(--text-muted);
+    overflow-wrap: anywhere;
 }
 
 .dashboard-shell {
@@ -269,6 +274,7 @@ button:disabled {
     align-items: flex-start;
     justify-content: space-between;
     gap: 16px;
+    flex-wrap: wrap;
 }
 
 .secondary-button {
@@ -373,6 +379,7 @@ button:disabled {
     justify-content: space-between;
     gap: 16px;
     align-items: center;
+    flex-wrap: wrap;
     margin-bottom: 24px;
     padding: 18px 20px;
     border: 1px solid rgba(255, 255, 255, 0.08);
@@ -383,12 +390,14 @@ button:disabled {
 .match-player-badge {
     display: grid;
     gap: 8px;
+    min-width: 0;
 }
 
 .match-player-actions {
     display: flex;
     gap: 12px;
     flex-wrap: wrap;
+    min-width: 0;
 }
 
 .match-actions {
@@ -405,7 +414,7 @@ button:disabled {
 
 .match-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(320px, 1fr));
     gap: 24px;
 }
 
@@ -414,6 +423,7 @@ button:disabled {
     gap: 6px;
     min-width: 90px;
     text-align: right;
+    flex-shrink: 0;
 }
 
 .score-card span {
@@ -437,6 +447,7 @@ button:disabled {
 .piece-card {
     display: grid;
     place-items: center;
+    min-width: 0;
     padding: 18px 12px;
     border-radius: 22px;
     border: 1px solid rgba(255, 255, 255, 0.12);
@@ -458,6 +469,7 @@ button:disabled {
     display: grid;
     grid-template-columns: repeat(4, 14px);
     gap: 4px;
+    justify-content: center;
 }
 
 .piece-mini-cell {
@@ -473,12 +485,15 @@ button:disabled {
 
 .board {
     margin-top: 18px;
+    width: 100%;
+    max-width: var(--board-max-size);
 }
 
 .board-grid {
     display: grid;
     grid-template-columns: repeat(var(--board-size, 8), minmax(0, 1fr));
     gap: 6px;
+    width: 100%;
 }
 
 .board-grid-interactive .board-cell {
@@ -487,7 +502,7 @@ button:disabled {
 
 .board-cell {
     aspect-ratio: 1 / 1;
-    min-height: 34px;
+    min-height: 0;
     border-radius: 10px;
     border: 1px solid rgba(255, 255, 255, 0.08);
     background: rgba(255, 255, 255, 0.04);
@@ -517,10 +532,23 @@ button:disabled {
     border-radius: 20px;
     padding: 18px;
     background: rgba(255, 255, 255, 0.04);
+    overflow-wrap: anywhere;
 }
 
 .board + .match-sidebar-card {
     margin-top: 18px;
+}
+
+#own-board,
+.board[aria-label="Griglia avversaria"] {
+    inline-size: min(100%, var(--board-max-size));
+}
+
+.match-player-banner strong,
+.board-section h3,
+.board-preview-card h3,
+#game-name-heading {
+    overflow-wrap: anywhere;
 }
 
 .status-inline-error {
@@ -644,7 +672,33 @@ button:disabled {
     }
 
     .pieces-picker {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .match-player-banner {
+        align-items: flex-start;
+        gap: 14px;
+    }
+
+    .board {
+        max-width: min(100vw - 88px, 560px);
+    }
+
+    .board-grid {
+        gap: 5px;
+    }
+
+    .board-cell {
+        border-radius: 8px;
+    }
+
+    .hero-copy,
+    .muted-copy,
+    .status,
+    .field span,
+    dt {
+        font-size: 0.96rem;
+        line-height: 1.5;
     }
 
     .match-player-actions {
@@ -654,5 +708,142 @@ button:disabled {
 
     .score-card {
         text-align: left;
+    }
+}
+
+@media (max-width: 640px) {
+    :root {
+        --board-max-size: min(100%, calc(100vw - 56px));
+    }
+
+    .dashboard-shell {
+        width: min(100%, calc(100% - 20px));
+        padding: 20px 0 28px;
+    }
+
+    .register-panel,
+    .hero-panel {
+        padding: 20px;
+        border-radius: 22px;
+    }
+
+    .dashboard-title {
+        font-size: clamp(2rem, 9vw, 3rem);
+    }
+
+    h2 {
+        font-size: clamp(1.6rem, 7vw, 2.2rem);
+    }
+
+    h3 {
+        font-size: 1.05rem;
+        line-height: 1.3;
+    }
+
+    .match-grid {
+        gap: 18px;
+    }
+
+    .match-player-banner,
+    .board-preview-card,
+    .match-sidebar-card,
+    .player-card {
+        gap: 12px;
+    }
+
+    .pieces-picker {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .piece-card {
+        padding: 14px 8px;
+        border-radius: 18px;
+    }
+
+    .piece-mini-board {
+        transform: scale(0.9);
+        transform-origin: center;
+    }
+
+    .board {
+        margin-inline: auto;
+    }
+
+    .board-grid {
+        gap: 4px;
+    }
+
+    .board-cell {
+        border-radius: 6px;
+    }
+
+    .hero-copy,
+    .muted-copy,
+    .status {
+        font-size: 0.92rem;
+    }
+}
+
+@media (max-width: 420px) {
+    :root {
+        --board-max-size: calc(100vw - 36px);
+    }
+
+    .dashboard-shell {
+        width: min(100%, calc(100% - 12px));
+    }
+
+    .register-panel,
+    .hero-panel {
+        padding: 16px;
+        border-radius: 18px;
+    }
+
+    .match-player-banner,
+    .board-preview-card,
+    .match-sidebar-card {
+        padding: 14px;
+    }
+
+    .dashboard-title {
+        font-size: clamp(1.6rem, 10vw, 2.2rem);
+    }
+
+    h2 {
+        font-size: clamp(1.35rem, 8vw, 1.8rem);
+        margin-bottom: 18px;
+    }
+
+    h3 {
+        font-size: 1rem;
+    }
+
+    .pieces-picker {
+        gap: 8px;
+    }
+
+    .piece-card {
+        padding: 12px 6px;
+    }
+
+    .piece-mini-board {
+        transform: scale(0.8);
+    }
+
+    .board-grid {
+        gap: 3px;
+    }
+
+    .board-cell {
+        border-radius: 5px;
+    }
+
+    .hero-copy,
+    .muted-copy,
+    .status,
+    .field span,
+    dt,
+    .score-card span {
+        font-size: 0.88rem;
     }
 }

@@ -632,7 +632,7 @@ export function renderMatchView(root, profile, gameId, options) {
                     </div>
 
                     <div class="board" aria-label="Griglia avversaria">
-                        ${renderBoardHtml(opponentState ? opponentState.board : createEmptyBoard(), [], false)}
+                        ${renderBoardHtml(opponentState ? opponentState.board : createEmptyBoard(ownState.board.length), [], false)}
                     </div>
 
                     <div class="match-sidebar-card">
@@ -1473,8 +1473,9 @@ function debugMoveFlow(step, details = {}) {
 }
 
 /**
+ * @param {number} [size]
  * @returns {number[][]}
  */
-function createEmptyBoard() {
-    return Array.from({ length: 8 }, () => Array.from({ length: 8 }, () => 0));
+function createEmptyBoard(size = 12) {
+    return Array.from({ length: size }, () => Array.from({ length: size }, () => 0));
 }
