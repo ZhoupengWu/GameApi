@@ -108,6 +108,8 @@ export function renderMatchView(root, profile, gameId, options) {
     /** @type {Array<{id: string, playerId: string, data: Record<string, unknown>, timestamp: string}>} */
     let currentMoves = [];
     let isSubmitting = false;
+    let isDraggingPiece = false;
+    let pendingRefreshAfterDrag = false;
     let disposed = false;
     let isEditingLocalPlayerName = false;
     let localPlayerDraftName = "";
@@ -139,6 +141,20 @@ export function renderMatchView(root, profile, gameId, options) {
      */
     function getMatchFinalStatus(winnerName) {
         return `completed - winner: ${winnerName}`;
+    }
+
+    /**
+     * @param {string} status
+     * @returns {string | null}
+     */
+    function getWinnerNameFromStatus(status) {
+        const prefix = "completed - winner: ";
+
+        if (!status.startsWith(prefix)) {
+            return null;
+        }
+
+        return status.slice(prefix.length).trim() || null;
     }
 
     /**
@@ -227,6 +243,15 @@ export function renderMatchView(root, profile, gameId, options) {
         localState.dragAnchorCell = { x: 0, y: 0 };
     }
 
+    function finishDragInteraction() {
+        isDraggingPiece = false;
+
+        if (pendingRefreshAfterDrag) {
+            pendingRefreshAfterDrag = false;
+            refreshGameState();
+        }
+    }
+
     /**
      * @param {string} pieceId
      * @param {number} x
@@ -289,6 +314,26 @@ export function renderMatchView(root, profile, gameId, options) {
         }
 
         return null;
+    }
+
+    /**
+     * @param {GameDetails} game
+     * @param {{id: string, name: string}} selfPlayer
+     * @returns {{type: "win" | "lose", message: string} | null}
+     */
+    function getPersistedMatchOutcome(game, selfPlayer) {
+        const winnerName = getWinnerNameFromStatus(game.status);
+
+        if (!winnerName) {
+            return null;
+        }
+
+        return {
+            type: winnerName === selfPlayer.name ? "win" : "lose",
+            message: winnerName === selfPlayer.name
+                ? "Vittoria: partita gia conclusa a tuo favore."
+                : `Sconfitta: la partita e gia stata vinta da ${winnerName}.`
+        };
     }
 
     /**
@@ -361,7 +406,7 @@ export function renderMatchView(root, profile, gameId, options) {
         const playerIds = Object.keys(gameState.players);
 
         if (playerIds.length <= 1) {
-            return true;
+            return false;
         }
 
         return gameState.currentTurnUserId === playerId;
@@ -479,7 +524,7 @@ export function renderMatchView(root, profile, gameId, options) {
             return;
         }
 
-        ownBoard.innerHTML = renderBoardHtml(ownState.board, getCurrentPreviewCells(ownState), true);
+        syncBoardPreview(ownBoard, getCurrentPreviewCells(ownState));
     }
 
     /**
@@ -493,14 +538,17 @@ export function renderMatchView(root, profile, gameId, options) {
     function renderBoardLayout(game, gameState, ownState, selfPlayer, opponentPlayer, opponentState) {
         const previewCells = getCurrentPreviewCells(ownState);
         const canMoveAtAll = hasPlayablePiece(ownState.board, ownState.upcomingPieces);
-        const matchOutcome = getMatchOutcome(gameState, selfPlayer.id, opponentPlayer ? opponentPlayer.id : null);
+        const hasTwoPlayers = game.players.length === 2;
+        const liveMatchOutcome = getMatchOutcome(gameState, selfPlayer.id, opponentPlayer ? opponentPlayer.id : null);
+        const persistedMatchOutcome = getPersistedMatchOutcome(game, selfPlayer);
+        const matchOutcome = liveMatchOutcome || persistedMatchOutcome;
         const matchCompletion = getMatchCompletion(gameState, game.players);
         const isLocalTurn = isPlayerTurn(gameState, selfPlayer.id);
         const turnLabel = gameState.currentTurnUserId
             ? game.players.find((entry) => entry.id === gameState.currentTurnUserId)?.name || "Player sconosciuto"
             : "In attesa";
         const turnNumber = gameState.version + 1;
-        const canDragPieces = isLocalTurn && canMoveAtAll && !matchOutcome;
+        const canDragPieces = hasTwoPlayers && isLocalTurn && canMoveAtAll && !matchOutcome;
 
         matchContent.innerHTML = `
             <div class="match-player-banner">
@@ -561,6 +609,8 @@ export function renderMatchView(root, profile, gameId, options) {
                     <p class="status ${canMoveAtAll ? "" : "status-inline-error"}" data-state="${canMoveAtAll ? "idle" : "error"}">
                         ${matchOutcome
                             ? matchOutcome.message
+                            : !hasTwoPlayers
+                            ? "Attendi l'ingresso del secondo player per iniziare la partita."
                             : !isLocalTurn
                             ? "Attendi il turno dell'altro player."
                             : canMoveAtAll
@@ -595,7 +645,7 @@ export function renderMatchView(root, profile, gameId, options) {
                         <p class="muted-copy">
                             ${opponentPlayer
                                 ? `Pezzi disturbo ricevuti: <strong>${String(ownState.garbageReceived)}</strong>`
-                                : "Quando l'altro player entra o piazza un blocco, questa schermata si sincronizza automaticamente."}
+                                : "Quando l'altro player entra, questa schermata si sincronizza automaticamente. Finche non siete in due non si puo giocare."}
                         </p>
                     </div>
                 </section>
@@ -815,8 +865,24 @@ export function renderMatchView(root, profile, gameId, options) {
         const changeLocalPlayerButton = root.querySelector("#change-local-player-button");
         const removeLocalPlayerButton = root.querySelector("#remove-local-player-button");
 
+        /**
+         * @returns {PlayerBoardState | null}
+         */
+        function getLiveOwnState() {
+            if (!currentGame) {
+                return null;
+            }
+
+            const gameState = getLatestGameState(currentGame.players, currentMoves);
+            return gameState.players[selfPlayer.id] || null;
+        }
+
         function canInteractThisTurn() {
             if (!currentGame) {
+                return false;
+            }
+
+            if (currentGame.players.length < 2 || currentGame.status.startsWith("completed")) {
                 return false;
             }
 
@@ -833,9 +899,16 @@ export function renderMatchView(root, profile, gameId, options) {
         piecesPicker?.addEventListener("dragstart", (event) => {
             if (!canInteractThisTurn()) {
                 event.preventDefault();
-                setStatus("Non e il tuo turno.", "error");
+                setStatus(
+                    currentGame && currentGame.players.length < 2
+                        ? "Attendi il secondo player prima di iniziare."
+                        : "Non e il tuo turno.",
+                    "error"
+                );
                 return;
             }
+
+            const liveOwnState = getLiveOwnState();
 
             const target = event.target;
 
@@ -873,21 +946,39 @@ export function renderMatchView(root, profile, gameId, options) {
 
             localState.draggedPieceId = pieceId;
             localState.previewPosition = null;
+            isDraggingPiece = true;
+            debugMoveFlow("dragstart", {
+                pieceId,
+                playerId: selfPlayer.id,
+                upcomingPieces: liveOwnState ? [...liveOwnState.upcomingPieces] : null
+            });
         });
 
         piecesPicker?.addEventListener("dragend", () => {
+            const liveOwnState = getLiveOwnState();
+
             if (localState.dropCommitted) {
                 localState.dropCommitted = false;
                 clearPlacementPreview();
+                finishDragInteraction();
                 return;
             }
 
             clearPlacementPreview();
-            updateOwnBoardPreview(ownState);
+            if (liveOwnState) {
+                updateOwnBoardPreview(liveOwnState);
+            }
+            finishDragInteraction();
         });
 
         ownBoard?.addEventListener("dragover", (event) => {
             if (!canInteractThisTurn()) {
+                return;
+            }
+
+            const liveOwnState = getLiveOwnState();
+
+            if (!liveOwnState) {
                 return;
             }
 
@@ -911,7 +1002,7 @@ export function renderMatchView(root, profile, gameId, options) {
             }
 
             dragEvent.preventDefault();
-            const position = clampPosition(ownState.board, pieceId, 0, {
+            const position = clampPosition(liveOwnState.board, pieceId, 0, {
                 x: Number(cell.dataset.cellX) - localState.dragAnchorCell.x,
                 y: Number(cell.dataset.cellY) - localState.dragAnchorCell.y
             });
@@ -920,7 +1011,7 @@ export function renderMatchView(root, profile, gameId, options) {
 
             if (!localState.previewPosition || localState.previewPosition.x !== x || localState.previewPosition.y !== y || localState.draggedPieceId !== pieceId) {
                 setPlacementPreview(pieceId, x, y);
-                updateOwnBoardPreview(ownState);
+                updateOwnBoardPreview(liveOwnState);
             }
         });
 
@@ -932,15 +1023,33 @@ export function renderMatchView(root, profile, gameId, options) {
             }
 
             if (localState.previewPosition) {
+                const liveOwnState = getLiveOwnState();
                 clearPlacementPreview();
-                updateOwnBoardPreview(ownState);
+
+                if (liveOwnState) {
+                    updateOwnBoardPreview(liveOwnState);
+                }
             }
         });
 
         ownBoard?.addEventListener("drop", async (event) => {
             if (!canInteractThisTurn()) {
                 event.preventDefault();
-                setStatus("Non e il tuo turno.", "error");
+                setStatus(
+                    currentGame && currentGame.players.length < 2
+                        ? "Attendi il secondo player prima di iniziare."
+                        : "Non e il tuo turno.",
+                    "error"
+                );
+                debugMoveFlow("drop-blocked-not-your-turn", { playerId: selfPlayer.id });
+                return;
+            }
+
+            const liveOwnState = getLiveOwnState();
+
+            if (!liveOwnState) {
+                debugMoveFlow("drop-missing-own-state", { playerId: selfPlayer.id });
+                finishDragInteraction();
                 return;
             }
 
@@ -960,6 +1069,8 @@ export function renderMatchView(root, profile, gameId, options) {
             const pieceId = dragEvent.dataTransfer?.getData("application/x-tetris-piece") || localState.draggedPieceId;
 
             if (!pieceId) {
+                debugMoveFlow("drop-missing-piece-id", { playerId: selfPlayer.id });
+                finishDragInteraction();
                 return;
             }
 
@@ -969,18 +1080,21 @@ export function renderMatchView(root, profile, gameId, options) {
                 x: Number(cell.dataset.cellX) - localState.dragAnchorCell.x,
                 y: Number(cell.dataset.cellY) - localState.dragAnchorCell.y
             };
-            const clampedPosition = clampPosition(ownState.board, pieceId, 0, position);
+            const clampedPosition = clampPosition(liveOwnState.board, pieceId, 0, position);
 
-            const previewCells = getPreviewCells(ownState.board, pieceId, 0, clampedPosition);
+            const previewCells = getPreviewCells(liveOwnState.board, pieceId, 0, clampedPosition);
 
             if (previewCells.length === 0) {
                 setStatus("Posizione non valida per il pezzo selezionato.", "error");
                 clearPlacementPreview();
-                updateOwnBoardPreview(ownState);
+                updateOwnBoardPreview(liveOwnState);
+                debugMoveFlow("drop-invalid-position", { pieceId, playerId: selfPlayer.id, position: clampedPosition });
+                finishDragInteraction();
                 return;
             }
 
             localState.dropCommitted = true;
+            debugMoveFlow("drop-submit", { pieceId, playerId: selfPlayer.id, position: clampedPosition });
             await submitCurrentMove(selfPlayer.id, pieceId, clampedPosition);
         });
 
@@ -1013,7 +1127,17 @@ export function renderMatchView(root, profile, gameId, options) {
      * @param {{x: number, y: number}} position
      */
     async function submitCurrentMove(localPlayerId, pieceId, position) {
-        if (!currentGame || isSubmitting) {
+        if (!currentGame) {
+            setStatus("Partita non disponibile. Riprova dopo la sincronizzazione.", "error");
+            debugMoveFlow("submit-skipped-no-game", { localPlayerId, pieceId, position });
+            finishDragInteraction();
+            return;
+        }
+
+        if (isSubmitting) {
+            setStatus("Attendi il completamento della mossa in corso.", "idle");
+            debugMoveFlow("submit-skipped-already-submitting", { localPlayerId, pieceId, position });
+            finishDragInteraction();
             return;
         }
 
@@ -1022,6 +1146,8 @@ export function renderMatchView(root, profile, gameId, options) {
 
         if (!ownState) {
             setStatus("Player locale non trovato nella partita.", "error");
+            debugMoveFlow("submit-missing-own-state", { localPlayerId, pieceId, position });
+            finishDragInteraction();
             return;
         }
 
@@ -1030,6 +1156,13 @@ export function renderMatchView(root, profile, gameId, options) {
         const previousMoves = currentMoves;
 
         try {
+            debugMoveFlow("submit-apply-move-start", {
+                localPlayerId,
+                pieceId,
+                position,
+                upcomingPieces: [...ownState.upcomingPieces],
+                version: gameState.version
+            });
             const { nextState, summary } = applyMove(
                 gameState,
                 localPlayerId,
@@ -1063,10 +1196,17 @@ export function renderMatchView(root, profile, gameId, options) {
                 renderBoardLayout(currentGame, nextState, nextOwnState, selfPlayer, opponentPlayer, nextOpponentState);
             }
 
+            debugMoveFlow("submit-request-start", { gameId: currentGame.id, localPlayerId, pieceId, position });
             const persistedMoveResult = await player.addMoveToGame(currentGame.id, localPlayerId, {
                 type: "tetris-turn",
                 gameState: nextState,
                 summary
+            });
+            debugMoveFlow("submit-request-success", {
+                gameId: currentGame.id,
+                localPlayerId,
+                pieceId,
+                moveId: persistedMoveResult.move.id
             });
             currentMoves = [...previousMoves, persistedMoveResult.move];
 
@@ -1082,14 +1222,29 @@ export function renderMatchView(root, profile, gameId, options) {
             }
 
             const message = error instanceof Error ? error.message : "Errore sconosciuto";
+            debugMoveFlow("submit-failed", {
+                localPlayerId,
+                pieceId,
+                position,
+                message,
+                upcomingPieces: [...ownState.upcomingPieces],
+                version: gameState.version
+            });
             setStatus(message, "error");
         } finally {
             isSubmitting = false;
+            finishDragInteraction();
         }
     }
 
     async function refreshGameState() {
         if (disposed) {
+            return;
+        }
+
+        if (isDraggingPiece) {
+            pendingRefreshAfterDrag = true;
+            debugMoveFlow("refresh-deferred-during-drag");
             return;
         }
 
@@ -1222,12 +1377,39 @@ function renderBoardHtml(board, previewCells, interactive) {
                     <button
                         type="button"
                         class="${classNames.join(" ")}"
-                        ${interactive ? `data-cell-x="${x}" data-cell-y="${y}"` : "disabled"}
+                        data-cell-x="${x}"
+                        data-cell-y="${y}"
+                        ${interactive ? "" : "disabled"}
                     ></button>
                 `;
             }).join("")).join("")}
         </div>
     `;
+}
+
+/**
+ * Keep the board DOM stable during drag and only toggle preview classes.
+ * Replacing the grid while dragging can cause browsers to lose the pending drop event.
+ *
+ * @param {HTMLDivElement} ownBoard
+ * @param {Array<{x: number, y: number}>} previewCells
+ */
+function syncBoardPreview(ownBoard, previewCells) {
+    const previewIndex = new Set(previewCells.map((cell) => `${cell.x}:${cell.y}`));
+    const boardCells = ownBoard.querySelectorAll("[data-cell-x][data-cell-y]");
+
+    if (boardCells.length === 0) {
+        return;
+    }
+
+    for (const element of boardCells) {
+        if (!(element instanceof HTMLElement)) {
+            continue;
+        }
+
+        const cellKey = `${element.dataset.cellX}:${element.dataset.cellY}`;
+        element.classList.toggle("board-cell-preview", previewIndex.has(cellKey));
+    }
 }
 
 /**
@@ -1279,6 +1461,14 @@ function getDragAnchorCell(pieceId, pieceMiniBoard, offsetX, offsetY) {
     }
 
     return selectedCell;
+}
+
+/**
+ * @param {string} step
+ * @param {Record<string, unknown>} [details]
+ */
+function debugMoveFlow(step, details = {}) {
+    console.debug("[tetris-move]", step, details);
 }
 
 /**

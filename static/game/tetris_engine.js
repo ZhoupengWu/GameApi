@@ -176,7 +176,7 @@ export function createInitialGameState(players) {
             userId,
             name: player.name,
             board: createEmptyBoard(BOARD_SIZE),
-            upcomingPieces: createUpcomingPieces(),
+            upcomingPieces: createInitialUpcomingPieces(userId),
             linesCleared: 0,
             garbageReceived: 0
         };
@@ -637,7 +637,7 @@ function normalizeGameState(state, players) {
                 userId,
                 name: player.name,
                 board: createEmptyBoard(nextState.boardSize),
-                upcomingPieces: createUpcomingPieces(),
+                upcomingPieces: createInitialUpcomingPieces(userId),
                 linesCleared: 0,
                 garbageReceived: 0
             };
@@ -712,6 +712,27 @@ function createUpcomingPieces() {
 }
 
 /**
+ * Generate a deterministic initial queue for a player.
+ * This avoids changing the available pieces every time the client reconstructs
+ * the state before the first persisted move exists.
+ *
+ * @param {string} seed
+ * @returns {Array<string>}
+ */
+function createInitialUpcomingPieces(seed) {
+    const pieceIds = Object.keys(PIECES);
+    const upcomingPieces = [];
+    let cursor = Math.abs(hashString(seed));
+
+    while (upcomingPieces.length < 3) {
+        upcomingPieces.push(pieceIds[cursor % pieceIds.length]);
+        cursor = Math.floor(cursor / pieceIds.length) + 1;
+    }
+
+    return upcomingPieces;
+}
+
+/**
  * @param {unknown} upcomingPieces
  * @returns {Array<string>}
  */
@@ -739,6 +760,21 @@ function refillUpcomingPieces(upcomingPieces) {
 function getRandomPieceId() {
     const pieceIds = Object.keys(PIECES);
     return pieceIds[Math.floor(Math.random() * pieceIds.length)];
+}
+
+/**
+ * @param {string} value
+ * @returns {number}
+ */
+function hashString(value) {
+    let hash = 0;
+
+    for (let index = 0; index < value.length; index += 1) {
+        hash = ((hash << 5) - hash) + value.charCodeAt(index);
+        hash |= 0;
+    }
+
+    return hash;
 }
 
 /**
