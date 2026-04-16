@@ -1,3 +1,5 @@
+const url_base = "https://fluffy-sniffle-x9r9jvjx76g36jxr-3000.app.github.dev"; // https://fluffy-sniffle-x9r9jvjx76g36jxr-3000.app.github.dev
+
 /**
  * @typedef {Object} user - User data
  * @property {string} user.id - ID of the user
@@ -69,7 +71,7 @@ export class Player {
         if (existingProfile) {
             this.#player_information = { ...existingProfile };
             this.#ready = Promise.resolve();
-            
+
             return;
         }
 
@@ -200,7 +202,7 @@ export class Player {
     async #request(path, options = {}) {
         await this.#ensureReady();
 
-        const response = await fetch(path, {
+        const response = await fetch(`${url_base ? url_base + path : path}`, {
             ...options,
             headers: {
                 "X-API-Key": this.#getApiKey(),

@@ -2,31 +2,32 @@ import swaggerJsdoc from 'swagger-jsdoc';
 
 const options = {
   definition: {
-    openapi: '3.0.0',
+    openapi: "3.0.0",
     info: {
-      title: 'Game API',
-      version: '1.0.0',
-      description: 'REST API backend for game management with API key authentication'
+      title: "Game API",
+      version: "1.0.0",
+      description:
+        "REST API backend for game management with API key authentication",
     },
     servers: [
       {
-        url: 'https://scaling-umbrella-pjp7wq64p65p2r9vj-3000.app.github.dev/',
-        description: 'Development server'
-      }
+        url: "https://scaling-umbrella-pjp7wq64p65p2r9vj-3000.app.github.dev/", // https://fluffy-sniffle-x9r9jvjx76g36jxr-3000.app.github.dev/  https://scaling-umbrella-pjp7wq64p65p2r9vj-3000.app.github.dev/
+        description: "Development server",
+      },
     ],
     components: {
       securitySchemes: {
         ApiKeyAuth: {
-          type: 'apiKey',
-          in: 'header',
-          name: 'X-API-Key',
-          description: 'API Key for authenticated routes'
-        }
-      }
+          type: "apiKey",
+          in: "header",
+          name: "X-API-Key",
+          description: "API Key for authenticated routes",
+        },
+      },
     },
-    security: []
+    security: [],
   },
-  apis: ['./src/routes/*.js']
+  apis: ["./src/routes/*.js"],
 };
 
 const swaggerSpec = swaggerJsdoc(options);

@@ -624,6 +624,7 @@ export function renderMatchView(root, profile, gameId, options) {
                             <p class="panel-kicker">La tua griglia</p>
                             <h3>${escapeHtml(selfPlayer.name)}</h3>
                         </div>
+                        <button id="aggiorna-button"> AGGIORNA </button>
                         <div class="score-card">
                             <span>Linee</span>
                             <strong>${String(ownState.linesCleared)}</strong>
@@ -687,6 +688,14 @@ export function renderMatchView(root, profile, gameId, options) {
         `;
 
         bindBoardInteractions(game, selfPlayer, ownState);
+
+        document.getElementById("aggiorna-button")?.addEventListener("click", async () => {
+            // Notifica le altre tab per un refresh globale
+            broadcastMatchUpdate("manual-refresh");
+
+            // Aggiorna la griglia e lo stato locale
+            await refreshGameState();
+        });
 
         root.querySelector("#leave-match-button")?.addEventListener("click", async () => {
             try {
