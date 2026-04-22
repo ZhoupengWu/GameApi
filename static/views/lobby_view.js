@@ -164,7 +164,10 @@ export function renderLobbyView(root, profile, options) {
                         <dd>${String(game.moves.length)}</dd>
                     </div>
                 </dl>
-                <button class="secondary-button lobby-action" type="button" data-open-game="${escapeHtml(game.id)}">Apri partita</button>
+                <div class="lobby-card-actions">
+                    <button class="secondary-button lobby-action" type="button" data-open-game="${escapeHtml(game.id)}">Apri partita</button>
+                    <button class="secondary-button lobby-action" type="button" data-delete-game="${escapeHtml(game.id)}">Elimina partita</button>
+                </div>
             </article>
         `).join("");
     }
@@ -252,17 +255,37 @@ export function renderLobbyView(root, profile, options) {
         openGameById();
     });
 
-    gamesList.addEventListener("click", (event) => {
+    gamesList.addEventListener("click", async (event) => {
         const target = event.target;
 
         if (!(target instanceof HTMLElement)) {
             return;
         }
 
-        const gameId = target.dataset.openGame;
+        const gameId = target.closest("[data-open-game]")?.getAttribute("data-open-game");
 
         if (gameId) {
             options.onOpenGame(gameId);
+            return;
+        }
+
+        const deleteGameId = target.closest("[data-delete-game]")?.getAttribute("data-delete-game");
+
+        if (deleteGameId) {
+            if (!window.confirm("Eliminare questa partita?")) {
+                return;
+            }
+
+            setStatus(gamesStatus, "Eliminazione partita in corso...", "idle");
+
+            try {
+                await player.deleteGame(deleteGameId);
+                setStatus(gamesStatus, "Partita eliminata.", "success");
+                await loadAccessibleGames();
+            } catch (error) {
+                const message = error instanceof Error ? error.message : "Errore sconosciuto";
+                setStatus(gamesStatus, message, "error");
+            }
         }
     });
 

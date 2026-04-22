@@ -1164,7 +1164,14 @@ export function renderMatchView(root, profile, gameId, options) {
                 clearLocalPlayerId();
                 clearPlacementPreview();
                 broadcastMatchUpdate("player-removed");
-                await refreshGameState();
+
+                const [updatedGame, updatedMoves] = await Promise.all([
+                    player.getGame(game.id),
+                    player.getGameMoves(game.id)
+                ]);
+
+                renderGame(updatedGame, updatedMoves);
+                setStatus("Player rimosso. Scegli un player locale.", "success");
             } catch (error) {
                 const message = error instanceof Error ? error.message : "Errore sconosciuto";
                 setStatus(message, "error");

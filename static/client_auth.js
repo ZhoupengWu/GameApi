@@ -1,4 +1,4 @@
-const url_base = "https://fluffy-sniffle-x9r9jvjx76g36jxr-3000.app.github.dev"; // https://fluffy-sniffle-x9r9jvjx76g36jxr-3000.app.github.dev
+const url_base = ""; // https://fluffy-sniffle-x9r9jvjx76g36jxr-3000.app.github.dev
 
 /**
  * @typedef {Object} user - User data
@@ -306,14 +306,12 @@ export class Player {
     /**
      * Elimina una partita dal backend.
      * @param {string} game_id game id
-     * @returns {Promise<string>}
+     * @returns {Promise<{message: string}>}
      */
     async deleteGame(game_id) {
-        const data = await this.#request(`/games/${game_id}`, {
+        return this.#request(`/games/${game_id}`, {
             method: "DELETE"
         });
-
-        return data;
     }
 
     /**

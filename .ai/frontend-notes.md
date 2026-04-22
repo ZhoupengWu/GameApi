@@ -35,7 +35,7 @@
 ## UI attuale
 
 - Schermata iniziale con due ingressi: registrazione nuova API key o incolla API key condivisa
-- Lobby con creazione partita, lista partite e apertura tramite id
+- Lobby con creazione partita, lista partite, apertura tramite id ed eliminazione delle partite create
 - Match view dove ogni tab seleziona il proprio player locale nella lobby
 - Gameplay Tetris a due con doppia griglia, turni alternati, queue di tre pezzi e pezzi disturbo sull'avversario
 - Catalogo pezzi piu ampio dei tetramini classici: il motore include anche forme custom in `static/game/tetris_engine.js`
@@ -56,6 +56,7 @@
 - Username vuoti vengono rifiutati come `Invalid username`
 - Le route `/games` richiedono sempre `X-API-Key`
 - `GET /games` mostra le lobby create dall'utente proprietario della API key
+- `DELETE /games/:gameId` viene usata dalla lobby per eliminare una partita creata
 - `POST /games/:gameId/players` viene usata per registrare i nomi player locali dentro la partita
 - `POST /games/:gameId/moves` viene usata per sincronizzare lo stato Tetris
 - `GET /games/:gameId/moves` e `POST /games/:gameId/moves` permettono di operare al proprietario del game; il controllo "player autenticato" nel backend resta disallineato rispetto agli embedded player

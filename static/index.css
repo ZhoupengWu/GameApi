@@ -335,8 +335,13 @@ button:disabled {
     overflow-wrap: anywhere;
 }
 
-.lobby-action {
+.lobby-card-actions {
+    display: grid;
+    gap: 10px;
     margin-top: 16px;
+}
+
+.lobby-action {
     width: 100%;
 }
 

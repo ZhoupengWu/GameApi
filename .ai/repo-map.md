@@ -10,6 +10,7 @@
 - `.ai/repo-map.md`: mappa rapida del repository
 - `.ai/frontend-notes.md`: note operative sul client statico
 - `.ai/backend-notes.md`: note operative sulle API e sulla persistenza
+- `.ai/tetris-game-flow.md`: flusso completo Tetris, richieste HTTP, payload e funzioni coinvolte
 
 ## Backend
 
